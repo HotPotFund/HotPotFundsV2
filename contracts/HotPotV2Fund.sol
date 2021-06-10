@@ -253,6 +253,9 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
         require(tickLower < tickUpper && token0 < token1, "ITV");
         address pool = IUniswapV3Factory(uniV3Factory).getPool(token0, token1, fee);
         require(pool != address(0), "ITF");
+        int24 tickspacing = IUniswapV3Pool(pool).tickSpacing();
+        require(tickLower % tickspacing == 0, "TLV");
+        require(tickUpper % tickspacing == 0, "TUV");
 
         // 2、添加流动池
         bool hasPool = false;

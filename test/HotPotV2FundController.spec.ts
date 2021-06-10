@@ -380,8 +380,8 @@ describe('HotPotV2FundController', () => {
               token0.address,
               token1.address,
               FeeAmount.MEDIUM,
-              getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM])+10,
-              getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM])-10,
+              getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]) + TICK_SPACINGS[FeeAmount.MEDIUM],
+              getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]) - TICK_SPACINGS[FeeAmount.MEDIUM],
               0)
 
             //token0 swapPath
