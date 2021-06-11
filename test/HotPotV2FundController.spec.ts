@@ -460,8 +460,8 @@ describe('HotPotV2FundController', () => {
                 fixture.controller.interface.encodeFunctionData("init",
                   [hotPotFund.address, token0.address, token1.address,
                       FeeAmount.MEDIUM,
-                      getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM])+10,
-                      getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM])-10, 0]
+                      getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]) + TICK_SPACINGS[FeeAmount.MEDIUM],
+                      getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]) - TICK_SPACINGS[FeeAmount.MEDIUM], 0]
                 ),
             ]
             await expect(fixture.controller.connect(depositor).multicall(data)).to.be.reverted;
@@ -478,8 +478,8 @@ describe('HotPotV2FundController', () => {
                 fixture.controller.interface.encodeFunctionData("init",
                   [hotPotFund.address, token0.address, token1.address,
                       FeeAmount.MEDIUM,
-                      getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM])+10,
-                      getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM])-10, 0]
+                      getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]) + TICK_SPACINGS[FeeAmount.MEDIUM],
+                      getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]) - TICK_SPACINGS[FeeAmount.MEDIUM], 0]
                 ),
             ]
             await expect(fixture.controller.connect(manager).multicall(data)).to.not.be.reverted;
