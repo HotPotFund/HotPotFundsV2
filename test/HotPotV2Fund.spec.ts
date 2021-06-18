@@ -23,7 +23,7 @@ import poolAtAddress from './shared/poolAtAddress'
 import { calExpectedWithdrawAmount, getExpectedAssetsOfPosition } from './shared/calExpecteds'
 import { ISwapRouter } from '../typechain/ISwapRouter'
 
-const initDepositAmount = 1e3;
+const initDepositAmount = 1e1;
 const INIT_DEPOSIT_AMOUNT_18 = expandTo18Decimals(initDepositAmount);
 const INIT_DEPOSIT_AMOUNT_6 = expandTo6Decimals(initDepositAmount);
 const IS_SHOW_LOG = false;
@@ -638,6 +638,7 @@ describe('HotPotV2Fund', () => {
             await expect(tx).to.not.be.reverted
             await snapshotGasCost(tx);
             await showAssetStatus("add [0][0] 1/4：");
+            let funds = await showAddLavePercent(INIT_DEPOSIT_AMOUNT.div(4), INIT_DEPOSIT_AMOUNT);
 
             tx = fixture.controller.connect(manager).add(
               hotPotFund.address,
@@ -647,6 +648,7 @@ describe('HotPotV2Fund', () => {
             await expect(tx).to.not.be.reverted
             await snapshotGasCost(tx);
             await showAssetStatus("add [0][1] 1/4：");
+            funds = await showAddLavePercent(INIT_DEPOSIT_AMOUNT.div(4), funds);
 
             tx = fixture.controller.connect(manager).add(
               hotPotFund.address,
@@ -656,6 +658,7 @@ describe('HotPotV2Fund', () => {
             await expect(tx).to.not.be.reverted
             await snapshotGasCost(tx);
             await showAssetStatus("add [1][0] 1/4：");
+            funds = await showAddLavePercent(INIT_DEPOSIT_AMOUNT.div(4), funds);
 
             tx = fixture.controller.connect(manager).add(
               hotPotFund.address,
@@ -665,6 +668,7 @@ describe('HotPotV2Fund', () => {
             await expect(tx).to.not.be.reverted
             await snapshotGasCost(tx);
             await showAssetStatus("add [2][0] 1/4：");
+            funds = await showAddLavePercent(INIT_DEPOSIT_AMOUNT.div(4), funds);
         })
     })
 
@@ -946,6 +950,14 @@ describe('HotPotV2Fund', () => {
         return outAmount;
     }
 
+    async function showAddLavePercent(sumAmount: BigNumber, currentBalance: BigNumber) {
+        const funds = await investToken.balanceOf(hotPotFund.address)
+        const addedAmount = currentBalance.sub(funds)
+        const percent = sumAmount.sub(addedAmount).mul(1e4).div(sumAmount).toNumber() / 1e2 + '%'
+        IS_SHOW_LOG && console.log(`addLavePercent:${percent}`)
+        return funds
+    }
+
     async function showAssetStatus(tag?: string, isReturn?: boolean) {
         tag = tag || new Date().getTime()+""
         let expectedTotalAssets = BigNumber.from(0);
@@ -1160,12 +1172,14 @@ describe('HotPotV2Fund', () => {
                   overrides
                 )).to.not.be.reverted
                 await showAssetStatus("add [0][0] 1/10：");
+                let funds = await showAddLavePercent(sumFundAmount.mul(1).div(10), INIT_DEPOSIT_AMOUNT.mul(2));
 
                 await expect(fixture.controller.add(
                   hotPotFund.address,
                   0, 1, sumFundAmount.mul(2).div(10), false
                 )).to.not.be.reverted
                 await showAssetStatus("add [0][1] 2/10：");
+                funds = await showAddLavePercent(sumFundAmount.mul(2).div(10), funds);
 
                 await expect(
                   fixture.controller.add(
@@ -1173,12 +1187,14 @@ describe('HotPotV2Fund', () => {
                   1, 0, sumFundAmount.mul(3).div(10), false
                 )).to.not.be.reverted
                 await showAssetStatus("add [1][0] 3/10：");
+                funds = await showAddLavePercent(sumFundAmount.mul(3).div(10), funds);
 
                 await expect(fixture.controller.add(
                   hotPotFund.address,
                   2, 0, sumFundAmount.mul(4).div(10), false
                 )).to.not.be.reverted
                 await showAssetStatus("add [2][0] 4/10：");
+                funds = await showAddLavePercent(sumFundAmount.mul(4).div(10), funds);
 
                 //add swap fee for t0+t1 pool
                 let outAmount = await addFeeToPool(token0, token1, INIT_DEPOSIT_AMOUNT)

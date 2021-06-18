@@ -463,16 +463,16 @@ library Position {
                 _amount = _amount0;
 
             if(params.token1 != token){
-                _amount += FullMath.mulDiv(
+                _amount = _amount.add(FullMath.mulDiv(
                     _amount1,
                     FullMath.mulDiv(params.price1, params.price1, FixedPoint96.Q96),
-                    FixedPoint96.Q96);
+                    FixedPoint96.Q96));
             }
             else
-                _amount += _amount1;
+                _amount = _amount.add(_amount1);
 
             amounts[i] = _amount;
-            amount += _amount;
+            amount = amount.add(_amount);
         }
         return(amount, amounts);
     }
@@ -526,12 +526,12 @@ library Position {
             address token1 = IUniswapV3Pool(pool).token1();
             if(token1 != token){
                 uint160 price1 = getSqrtPriceX96(sellPath[token1], uniV3Factory, false);
-                amount += FullMath.mulDiv(
+                amount = amount.add(FullMath.mulDiv(
                     amount1,
                     FullMath.mulDiv(price1, price1, FixedPoint96.Q96),
-                    FixedPoint96.Q96);
+                    FixedPoint96.Q96));
             } else
-                amount += amount1;
+                amount = amount.add(amount1);
         }
     }
 
@@ -605,46 +605,46 @@ library Position {
 
         // 计算总的手续费.
         // overflow is acceptable, have to withdraw before you hit type(uint128).max fees
-        amount0 += tokensOwed0;
-        amount1 += tokensOwed1;
+        amount0 = amount0.add(tokensOwed0);
+        amount1 = amount1.add(tokensOwed1);
 
         // 计算流动性资产
         if (params.tickCurrent < params.tickLower) {
             // current tick is below the passed range; liquidity can only become in range by crossing from left to
             // right, when we'll need _more_ token0 (it's becoming more valuable) so user must provide it
-            amount0 += uint256(
+            amount0 = amount0.add(uint256(
                 -SqrtPriceMath.getAmount0Delta(
                     TickMath.getSqrtRatioAtTick(params.tickLower),
                     TickMath.getSqrtRatioAtTick(params.tickUpper),
                     -int256(liquidity).toInt128()
                 )
-            );
+            ));
         } else if (params.tickCurrent < params.tickUpper) {
             // current tick is inside the passed range
-            amount0 += uint256(
+            amount0 = amount0.add(uint256(
                 -SqrtPriceMath.getAmount0Delta(
                     params.sqrtPriceX96,
                     TickMath.getSqrtRatioAtTick(params.tickUpper),
                     -int256(liquidity).toInt128()
                 )
-            );
-            amount1 += uint256(
+            ));
+            amount1 = amount1.add(uint256(
                 -SqrtPriceMath.getAmount1Delta(
                     TickMath.getSqrtRatioAtTick(params.tickLower),
                     params.sqrtPriceX96,
                     -int256(liquidity).toInt128()
                 )
-            );
+            ));
         } else {
             // current tick is above the passed range; liquidity can only become in range by crossing from right to
             // left, when we'll need _more_ token1 (it's becoming more valuable) so user must provide it
-            amount1 += uint256(
+            amount1 = amount1.add(uint256(
                 -SqrtPriceMath.getAmount1Delta(
                     TickMath.getSqrtRatioAtTick(params.tickLower),
                     TickMath.getSqrtRatioAtTick(params.tickUpper),
                     -int256(liquidity).toInt128()
                 )
-            );
+            ));
         }
     }
 

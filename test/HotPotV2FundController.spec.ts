@@ -3,7 +3,12 @@ import { Fixture } from 'ethereum-waffle'
 import { waffle } from 'hardhat'
 import { expect } from './shared/expect'
 
-import { INIT_FOR_TEST_TOKEN_AMOUNT_18, INIT_FOR_TEST_WETH_AMOUNT, mintAndDepositHotPotFund } from './shared/fixtures'
+import {
+    INIT_FOR_TEST_TOKEN_AMOUNT_18,
+    INIT_FOR_TEST_TOKEN_AMOUNT_6,
+    INIT_FOR_TEST_WETH_AMOUNT,
+    mintAndDepositHotPotFund
+} from './shared/fixtures'
 import completeFixture, { CompleteFixture } from './shared/completeFixture'
 import { createFund, createUniV3PoolAndInit } from './shared/createUtils'
 import { IHotPotV2Fund } from '../typechain'
@@ -39,7 +44,7 @@ describe('HotPotV2FundController', () => {
 
         //transfer tokens to tester
         for (const token of fixture.tokens) {
-            await token.connect(manager).transfer(depositor.address, INIT_FOR_TEST_TOKEN_AMOUNT_18)
+            await token.connect(manager).transfer(depositor.address, await token.decimals() == 18 ? INIT_FOR_TEST_TOKEN_AMOUNT_18 : INIT_FOR_TEST_TOKEN_AMOUNT_6)
         }
         await fixture.weth9.connect(manager).deposit({value: INIT_FOR_TEST_WETH_AMOUNT})
 
@@ -94,10 +99,14 @@ describe('HotPotV2FundController', () => {
         await expect(fixture.controller.connect(depositor).setGovernance(manager.address))
           .to.be.reverted;//With("Only called by Governance.");
 
-        await expect(fixture.controller.connect(governance).setGovernance(depositor.address)).to.not.be.reverted;
+        await expect(fixture.controller.connect(governance).setGovernance(depositor.address))
+          .to.emit(fixture.controller, "SetGovernance")
+          .withArgs(depositor.address);
         await expect(await fixture.controller.governance()).to.eq(depositor.address);
 
-        await expect(fixture.controller.connect(depositor).setGovernance(governance.address)).to.not.be.reverted;
+        await expect(fixture.controller.connect(depositor).setGovernance(governance.address))
+          .to.emit(fixture.controller, "SetGovernance")
+          .withArgs(governance.address);
         await expect(await fixture.controller.governance()).to.eq(governance.address);
     });
 
@@ -151,7 +160,9 @@ describe('HotPotV2FundController', () => {
             //fundToken->HPT->weth9->HPT
             const path = encodePath([investToken.address, fixture.tokenHotPot.address, fixture.weth9.address, fixture.tokenHotPot.address],
               [FeeAmount.MEDIUM, FeeAmount.MEDIUM, FeeAmount.MEDIUM]);
-            await expect(fixture.controller.connect(governance).setHarvestPath(investToken.address, path)).to.not.be.reverted;
+            await expect(fixture.controller.connect(governance).setHarvestPath(investToken.address, path))
+              .to.emit(fixture.controller, "SetHarvestPath")
+              .withArgs(investToken.address, path);
             expect(await fixture.controller.harvestPath(investToken.address)).to.eq(path);
         });
     })
@@ -201,18 +212,24 @@ describe('HotPotV2FundController', () => {
 
         it("works if it's a action called by manager", async () => {
             //singlePath
+            let path = encodePath([investToken.address, token0.address], [FeeAmount.MEDIUM]);
             await expect(fixture.controller.connect(manager).setPath(
               hotPotFund.address,
               token0.address,
-              encodePath([investToken.address, token0.address], [FeeAmount.MEDIUM])
-            )).to.not.be.reverted;
+              path
+            ))
+            .to.emit(fixture.controller, "SetPath")
+            .withArgs(hotPotFund.address, token0.address, path);
 
             //multiPath
+            path = encodePath([investToken.address, token1.address, token0.address], [FeeAmount.MEDIUM, FeeAmount.MEDIUM]);
             await expect(fixture.controller.connect(manager).setPath(
               hotPotFund.address,
               token0.address,
-              encodePath([investToken.address, token1.address, token0.address], [FeeAmount.MEDIUM, FeeAmount.MEDIUM])
-            )).to.not.be.reverted;
+              path
+            ))
+            .to.emit(fixture.controller, "SetPath")
+            .withArgs(hotPotFund.address, token0.address, path);
         });
 
         it("fails if pool isn't exits", async () =>{

@@ -65,6 +65,7 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
             }
         }
         harvestPath[token] = _path;
+        emit SetHarvestPath(token, _path);
     }
 
     /// @inheritdoc IHotPotV2FundController
@@ -88,6 +89,7 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
     function setGovernance(address account) external override onlyGovernance {
         require(account != address(0));
         governance = account;
+        emit SetGovernance(account);
     }
 
     /// @inheritdoc IGovernanceActions
@@ -143,6 +145,7 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
                 break;
             }
         }
+        emit SetPath(fund, distToken, _path);
         if(!isBuy) (_path, _reverse) = (_reverse, _path);
         IHotPotV2Fund(fund).setPath(distToken, _path, _reverse);
     }

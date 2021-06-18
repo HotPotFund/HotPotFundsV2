@@ -100,12 +100,10 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
         //当前是WETH9基金
         if(token == WETH9){
             // 普通用户发起的转账ETH，认为是deposit
-            if(msg.sender != WETH9){
-                require(msg.value > 0,"DAZ");
-                uint amount = address(this).balance;
-                uint total_assets = totalAssets();
-                IWETH9(WETH9).deposit{value: amount}();
-                _deposit(amount, total_assets);
+            if(msg.sender != WETH9 && msg.value > 0){
+                uint totals = totalAssets();
+                IWETH9(WETH9).deposit{value: address(this).balance}();
+                _deposit(msg.value, totals);
             } //else 接收WETH9向合约转账ETH
         }
         // 不是WETH基金, 不接受ETH转账
@@ -126,7 +124,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
         for(uint i=0; i<pools.length; i++){
             uint _amount;
             (_amount, amounts[i]) = _assetsOfPool(i);
-            _totalAssets += _amount;
+            _totalAssets = _totalAssets.add(_amount);
         }
 
         amount = FullMath.mulDiv(_totalAssets, share, totalSupply);
@@ -395,7 +393,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
         for(uint i = 0; i < pools.length; i++){
             uint _amount;
             (_amount, ) = _assetsOfPool(i);
-            amount += _amount;
+            amount = amount.add(_amount);
         }
     }
 
