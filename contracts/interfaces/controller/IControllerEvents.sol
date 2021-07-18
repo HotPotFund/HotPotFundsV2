@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity >=0.5.0;  
+pragma solidity >=0.5.0;
 
 /// @title HotPotV2Controller 事件接口定义
 interface IControllerEvents {
@@ -17,4 +17,7 @@ interface IControllerEvents {
 
     /// @notice 当调用setPath时触发
     event SetPath(address indexed fund, address indexed distToken, bytes path);
+
+    /// @notice 当调用setMaxHarvestSlippage时触发
+    event SetMaxHarvestSlippage(uint slippage);
 }

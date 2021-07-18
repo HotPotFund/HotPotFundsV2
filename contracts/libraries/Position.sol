@@ -2,23 +2,17 @@
 pragma solidity >=0.7.5;
 pragma abicoder v2;
 
-import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
-import '@uniswap/v3-core/contracts/libraries/FullMath.sol';
+import './PathPrice.sol';
 import "@uniswap/v3-core/contracts/libraries/FixedPoint128.sol";
 import '@uniswap/v3-periphery/contracts/libraries/PositionKey.sol';
 import '@uniswap/v3-core/contracts/libraries/LowGasSafeMath.sol';
-import "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
-import '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 import '@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import "@uniswap/v3-core/contracts/libraries/SqrtPriceMath.sol";
-import "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
-import "@uniswap/v3-periphery/contracts/libraries/Path.sol";
 
 library Position {
     using LowGasSafeMath for uint;
     using SafeCast for int256;
-    using Path for bytes;
 
     uint constant DIVISOR = 100 << 128;
 
@@ -88,7 +82,7 @@ library Position {
             if(params.token == params.token0){
                 equalAmount0 = params.amount0.add(params.amount);
             } else {
-                buy0Price = getSqrtPriceX96(buyPath[params.token0], params.uniV3Factory, true);
+                buy0Price = PathPrice.getSqrtPriceX96(buyPath[params.token0], params.uniV3Factory, true);
                 equalAmount0 = params.amount0.add((FullMath.mulDiv(
                     params.amount,
                     FullMath.mulDiv(buy0Price, buy0Price, FixedPoint96.Q96),
@@ -100,19 +94,11 @@ library Position {
 
         //将token1换算成token0
         if(params.amount1 > 0){
-            if(params.token0 < params.token1){
-                equalAmount0 = equalAmount0.add((FullMath.mulDiv(
-                    params.amount1,
-                    FixedPoint96.Q96,
-                    FullMath.mulDiv(params.sqrtPriceX96, params.sqrtPriceX96, FixedPoint96.Q96)
-                )));
-            } else {
-                equalAmount0 = equalAmount0.add((FullMath.mulDiv(
-                    params.amount1,
-                    FullMath.mulDiv(params.sqrtPriceX96, params.sqrtPriceX96, FixedPoint96.Q96),
-                    FixedPoint96.Q96
-                )));
-            }
+            equalAmount0 = equalAmount0.add((FullMath.mulDiv(
+                params.amount1,
+                FixedPoint96.Q96,
+                FullMath.mulDiv(params.sqrtPriceX96, params.sqrtPriceX96, FixedPoint96.Q96)
+            )));
         }
         require(equalAmount0 > 0, "EIZ");
 
@@ -127,6 +113,7 @@ library Position {
                 uint fundToT0;
                 if(params.token0 == params.token){
                     fundToT0 = amount0Max - params.amount0;
+                    if(fundToT0 > params.amount) fundToT0 = params.amount;
                     amount0Max = params.amount0.add(fundToT0);
                 } else {
                     fundToT0 = FullMath.mulDiv(
@@ -135,13 +122,15 @@ library Position {
                         FullMath.mulDiv(buy0Price, buy0Price, FixedPoint96.Q96)
                     );
                     if(fundToT0 > params.amount) fundToT0 = params.amount;
-                    amount0Max = params.amount0.add(ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
-                        path: buyPath[params.token0],
-                        recipient: address(this),
-                        deadline: block.timestamp,
-                        amountIn: fundToT0,
-                        amountOutMinimum: 0
-                    })));
+                    if(fundToT0 > 0) {
+                        amount0Max = params.amount0.add(ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
+                            path: buyPath[params.token0],
+                            recipient: address(this),
+                            deadline: block.timestamp,
+                            amountIn: fundToT0,
+                            amountOutMinimum: 0
+                        })));
+                    } else amount0Max = params.amount0;
                 }
                 // 基金本币兑换成token1
                 if(params.token1 == params.token){
@@ -193,7 +182,7 @@ library Position {
         else {
             // 多余的t0兑换成t1
             if(amount0Max < params.amount0){
-                amount1Max = amount1Max.add(ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
+                amount1Max = params.amount1.add(ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
                     path: abi.encodePacked(params.token0, params.fee, params.token1),
                     recipient: address(this),
                     deadline: block.timestamp,
@@ -420,12 +409,12 @@ library Position {
         if(params.token0 != token){
             bytes memory path = sellPath[params.token0];
             if(path.length == 0) return(amount, amounts);
-            params.price0 = getSqrtPriceX96(path, uniV3Factory, false);
+            params.price0 = PathPrice.getSqrtPriceX96(path, uniV3Factory, false);
         }
         if(params.token1 != token){
             bytes memory path = sellPath[params.token1];
             if(path.length == 0) return(amount, amounts);
-            params.price1 = getSqrtPriceX96(path, uniV3Factory, false);
+            params.price1 = PathPrice.getSqrtPriceX96(path, uniV3Factory, false);
         }
 
         (params.sqrtPriceX96, params.tick, , , , , ) = IUniswapV3Pool(pool).slot0();
@@ -514,7 +503,7 @@ library Position {
         if(amount0 > 0){
             address token0 = IUniswapV3Pool(pool).token0();
             if(token0 != token){
-                uint160 price0 = getSqrtPriceX96(sellPath[token0], uniV3Factory, false);
+                uint160 price0 = PathPrice.getSqrtPriceX96(sellPath[token0], uniV3Factory, false);
                 amount = FullMath.mulDiv(
                     amount0,
                     FullMath.mulDiv(price0, price0, FixedPoint96.Q96),
@@ -525,7 +514,7 @@ library Position {
         if(amount1 > 0){
             address token1 = IUniswapV3Pool(pool).token1();
             if(token1 != token){
-                uint160 price1 = getSqrtPriceX96(sellPath[token1], uniV3Factory, false);
+                uint160 price1 = PathPrice.getSqrtPriceX96(sellPath[token1], uniV3Factory, false);
                 amount = amount.add(FullMath.mulDiv(
                     amount1,
                     FullMath.mulDiv(price1, price1, FixedPoint96.Q96),
@@ -708,47 +697,5 @@ library Position {
 
         feeGrowthInside0X128 = params.feeGrowthGlobal0X128 - feeGrowthBelow0X128 - feeGrowthAbove0X128;
         feeGrowthInside1X128 = params.feeGrowthGlobal1X128 - feeGrowthBelow1X128 - feeGrowthAbove1X128;
-    }
-
-    /// @notice 根据设定的兑换路径，获取目标代币的价格平方根
-    /// @param path 兑换路径
-    /// @param isCurrentPrice 获取当前价格, 还是预言机价格
-    /// @return sqrtPriceX96 价格的平方根(X 2^96)，给定兑换路径的 tokenOut / tokenIn 的价格
-    function getSqrtPriceX96(
-        bytes memory path, 
-        address uniV3Factory,
-        bool isCurrentPrice
-    ) internal view returns (uint160 sqrtPriceX96){
-        require(path.length > 0, "IPL");
-
-        sqrtPriceX96 = uint160(1 << FixedPoint96.RESOLUTION);
-        while (true) {
-            bool hasMultiplePools = path.hasMultiplePools();
-            (address tokenIn, address tokenOut, uint24 fee) = path.decodeFirstPool();
-            IUniswapV3Pool pool = IUniswapV3Pool(PoolAddress.computeAddress(uniV3Factory, PoolAddress.getPoolKey(tokenIn, tokenOut, fee)));
-
-            uint160 _sqrtPriceX96;
-            if(isCurrentPrice){
-                (_sqrtPriceX96,,,,,,) = pool.slot0();
-            } else {
-                uint32[] memory secondAges= new uint32[](2);
-                secondAges[0] = 0;
-                secondAges[1] = 1;
-                (int56[] memory tickCumulatives,) = pool.observe(secondAges);
-                _sqrtPriceX96 = TickMath.getSqrtRatioAtTick(int24(tickCumulatives[0] - tickCumulatives[1]));
-            }
-            
-            sqrtPriceX96 = uint160(
-                tokenIn > tokenOut
-                ? FullMath.mulDiv(sqrtPriceX96, FixedPoint96.Q96, _sqrtPriceX96)
-                : FullMath.mulDiv(sqrtPriceX96, _sqrtPriceX96, FixedPoint96.Q96)
-            );
-
-            // decide whether to continue or terminate
-            if (hasMultiplePools)
-                path = path.skipToken();
-            else
-                return sqrtPriceX96;
-        }
     }
 }

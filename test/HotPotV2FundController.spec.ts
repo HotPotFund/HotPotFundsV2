@@ -47,6 +47,7 @@ describe('HotPotV2FundController', () => {
             await token.connect(manager).transfer(depositor.address, await token.decimals() == 18 ? INIT_FOR_TEST_TOKEN_AMOUNT_18 : INIT_FOR_TEST_TOKEN_AMOUNT_6)
         }
         await fixture.weth9.connect(manager).deposit({value: INIT_FOR_TEST_WETH_AMOUNT})
+        await fixture.weth9.connect(depositor).deposit({value: INIT_FOR_TEST_WETH_AMOUNT})
 
         fixture.tokens = fixture.tokens.sort((a, b) => (a.address.toLowerCase() < b.address.toLowerCase() ? -1 : 1))
         investToken = fixture.tokens[0];
@@ -89,9 +90,12 @@ describe('HotPotV2FundController', () => {
     })
 
     it('constructor initializes', async () => {
+        await expect(await fixture.controller.uniV3Factory()).to.eq(fixture.uniV3Factory.address);
         await expect(await fixture.controller.uniV3Router()).to.eq(fixture.uniV3Router.address);
         await expect(await fixture.controller.hotpot()).to.eq(fixture.tokenHotPot.address);
+        await expect(await fixture.controller.WETH9()).to.eq(fixture.weth9.address);
         await expect(await fixture.controller.governance()).to.eq(governance.address);
+        await expect(await fixture.controller.maxHarvestSlippage()).to.eq(20);
     });
 
     it('setGovernance', async () => {
@@ -164,6 +168,29 @@ describe('HotPotV2FundController', () => {
               .to.emit(fixture.controller, "SetHarvestPath")
               .withArgs(investToken.address, path);
             expect(await fixture.controller.harvestPath(investToken.address)).to.eq(path);
+        });
+    })
+
+    describe('#setMaxHarvestSlippage', () => {
+        it("fail if it's not a action called by governance", async () => {
+            await expect(fixture.controller.connect(depositor).setMaxHarvestSlippage(30))
+              .to.be.revertedWith("OGC");
+        });
+
+        it("fail if slippage > 100", async () => {
+            await expect(fixture.controller.connect(governance).setMaxHarvestSlippage(101))
+              .to.be.revertedWith("SMS");
+        });
+        it("works if slippage <= 100", async () => {
+            await expect(fixture.controller.connect(governance).setMaxHarvestSlippage(0))
+              .to.emit(fixture.controller, "SetMaxHarvestSlippage").withArgs(0);
+            await expect(await fixture.controller.maxHarvestSlippage()).to.eq(0);
+            await expect(fixture.controller.connect(governance).setMaxHarvestSlippage(30))
+              .to.emit(fixture.controller, "SetMaxHarvestSlippage").withArgs(30);
+            await expect(await fixture.controller.maxHarvestSlippage()).to.eq(30);
+            await expect(fixture.controller.connect(governance).setMaxHarvestSlippage(100))
+              .to.emit(fixture.controller, "SetMaxHarvestSlippage").withArgs(100);
+            await expect(await fixture.controller.maxHarvestSlippage()).to.eq(100);
         });
     })
 
@@ -509,6 +536,29 @@ describe('HotPotV2FundController', () => {
               .to.be.reverted;
             await expect(fixture.controller.harvest(investToken.address, INIT_HARVEST_AMOUNT))
               .to.be.reverted;
+        });
+
+        it("fail if the slippage is too big", async() => {
+            //transfer test token to controller
+            await expect(investToken.connect(manager).transfer(fixture.controller.address, INIT_HARVEST_AMOUNT))
+              .to.not.be.reverted;
+            await expect(await investToken.balanceOf(fixture.controller.address))
+              .to.eq(INIT_HARVEST_AMOUNT);
+
+            //create fund+weth9 pool
+            await createUniV3PoolAndInit(manager, fixture, investToken, fixture.weth9);
+
+            //set token -> HPT path
+            const path = encodePath([investToken.address, fixture.weth9.address, fixture.tokenHotPot.address], [FeeAmount.MEDIUM, FeeAmount.MEDIUM]);
+            await expect(fixture.controller.connect(governance).setHarvestPath(investToken.address, path))
+              .to.not.be.reverted;
+
+            //mock too large slippage harvest
+            await fixture.weth9.connect(depositor).transfer(fixture.testHarvest.address, INIT_FOR_TEST_WETH_AMOUNT);
+            await expect(fixture.testHarvest.harvest(
+                investToken.address, INIT_HARVEST_AMOUNT, INIT_FOR_TEST_WETH_AMOUNT.div(2),
+                encodePath([fixture.weth9.address, fixture.tokenHotPot.address], [FeeAmount.MEDIUM]))
+            ).to.be.revertedWith("MHS");
         });
 
         it("works if there is a balance and path", async() => {

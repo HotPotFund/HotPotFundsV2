@@ -3,10 +3,9 @@ pragma solidity =0.7.6;
 pragma abicoder v2;
 
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
-import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
-import '@uniswap/v3-periphery/contracts/libraries/Path.sol';
+import './libraries/PathPrice.sol';
 import './interfaces/IHotPotV2Fund.sol';
 import './interfaces/IHotPot.sol';
 import './interfaces/IHotPotV2FundController.sol';
@@ -20,6 +19,7 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
     address public override immutable hotpot;
     address public override governance;
     address public override immutable WETH9;
+    uint public override maxHarvestSlippage = 20;//0-100
 
     mapping (address => bool) public override verifiedToken;
     mapping (address => bytes) public override harvestPath;
@@ -51,13 +51,18 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
     /// @inheritdoc IGovernanceActions
     function setHarvestPath(address token, bytes memory path) external override onlyGovernance {
         bytes memory _path = path;
-        (address tokenIn, address tokenOut, uint24 fee) = path.decodeFirstPool();
         while (true) {
+            (address tokenIn, address tokenOut, uint24 fee) = path.decodeFirstPool();
+
             // pool is exist
-            require(IUniswapV3Factory(uniV3Factory).getPool(tokenIn, tokenOut, fee) != address(0), "PIE");
+            address pool = IUniswapV3Factory(uniV3Factory).getPool(tokenIn, tokenOut, fee);
+            require(pool != address(0), "PIE");
+            // at least 2 observations
+            (,,,uint16 observationCardinality,,,) = IUniswapV3Pool(pool).slot0();
+            require(observationCardinality >= 2, "OC");
+
             if (path.hasMultiplePools()) {
                 path = path.skipToken();
-                (tokenIn, tokenOut, fee) = path.decodeFirstPool();
             } else {
                 //最后一个交易对：输入WETH9, 输出hotpot
                 require(tokenIn == WETH9 && tokenOut == hotpot, "IOT");
@@ -68,11 +73,25 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
         emit SetHarvestPath(token, _path);
     }
 
+    /// @inheritdoc IGovernanceActions
+    function setMaxHarvestSlippage(uint slippage) external override onlyGovernance {
+        require(slippage <= 100 ,"SMS");
+        maxHarvestSlippage = slippage;
+        emit SetMaxHarvestSlippage(slippage);
+    }
+
     /// @inheritdoc IHotPotV2FundController
     function harvest(address token, uint amount) external override returns(uint burned) {
         uint value = amount <= IERC20(token).balanceOf(address(this)) ? amount : IERC20(token).balanceOf(address(this));
         TransferHelper.safeApprove(token, uniV3Router, value);
 
+        uint curPirce = PathPrice.getSqrtPriceX96(harvestPath[token], uniV3Factory, true);
+        uint lastPrice = PathPrice.getSqrtPriceX96(harvestPath[token], uniV3Factory, false);
+        if(lastPrice > curPirce) {
+            lastPrice = FullMath.mulDiv(lastPrice, lastPrice, FixedPoint96.Q96);
+            require(FullMath.mulDiv(lastPrice - FullMath.mulDiv(curPirce, curPirce, FixedPoint96.Q96), 100, lastPrice) <= maxHarvestSlippage, "MHS");
+        }
+        
         ISwapRouter.ExactInputParams memory args = ISwapRouter.ExactInputParams({
             path: harvestPath[token],
             recipient: address(this),
@@ -115,7 +134,7 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
         // 第一个tokenIn是基金token，那么就是buy路径
         if(tokenIn == fundToken){
             isBuy = true;
-        } 
+        }
         // 如果是sellPath, 第一个需要是目标代币
         else{
             require(tokenIn == distToken);

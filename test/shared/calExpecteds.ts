@@ -39,7 +39,7 @@ export function getAmountsForAmount0(
     // b = SPc*(SPu - SPc)
     const b96 = sqrtPriceX96.mul(sqrtPriceU96.sub(sqrtPriceX96)).div(FixedPoint96.Q96)
     // △x0 = △x/(a/b +1) = △x*b/(a+b)
-    amount0 = deltaX.mul(a96).div(a96.add(b96))
+    amount0 = deltaX.mul(b96).div(a96.add(b96))
   }
 
   //剩余的转成t1
@@ -340,7 +340,7 @@ function divRoundingUp(x: BigNumber, y: BigNumber) {
 
 function mulDivRoundingUp(a: BigNumber, b: BigNumber, denominator: BigNumber) {
   let result = a.mul(b).div(denominator)
-  if (a.mul(b).mod(denominator).gt(0)) result.add(1)
+  if (a.mul(b).mod(denominator).gt(0)) result = result.add(1)
   return result
 }
 

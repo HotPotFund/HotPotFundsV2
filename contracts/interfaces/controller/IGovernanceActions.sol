@@ -19,4 +19,9 @@ interface IGovernanceActions {
     /// @param token 目标代币
     /// @param path 路径
     function setHarvestPath(address token, bytes memory path) external;
+
+    /// @notice Set the max slippage for harvest
+    /// @dev This function can only be called by governance
+    /// @param slippage 0-100
+    function setMaxHarvestSlippage(uint slippage) external;
 }

@@ -26,4 +26,7 @@ interface IControllerState {
     /// @notice harvest时交易路径
     /// @param token 要兑换的代币
     function harvestPath(address token) external view returns (bytes memory);
+
+    /// @notice harvest时最大滑点 0-100
+    function maxHarvestSlippage() external view returns (uint);
 }
