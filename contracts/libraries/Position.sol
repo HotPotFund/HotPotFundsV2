@@ -13,6 +13,7 @@ import "@uniswap/v3-core/contracts/libraries/SqrtPriceMath.sol";
 library Position {
     using LowGasSafeMath for uint;
     using SafeCast for int256;
+    // using Path for bytes;
 
     uint constant DIVISOR = 100 << 128;
 
@@ -38,9 +39,9 @@ library Position {
         // 部分t0
         else if( sqrtPriceX96 < sqrtPriceU96){
             // a = SPu*(SPc - SPl)
-            uint a = FullMath.mulDiv(sqrtPriceU96, sqrtPriceX96 - sqrtPriceL96, FixedPoint96.Q96);
+            uint a = FullMath.mulDiv(sqrtPriceU96, sqrtPriceX96 - sqrtPriceL96, FixedPoint64.Q64);
             // b = SPc*(SPu - SPc)
-            uint b = FullMath.mulDiv(sqrtPriceX96, sqrtPriceU96 - sqrtPriceX96, FixedPoint96.Q96);
+            uint b = FullMath.mulDiv(sqrtPriceX96, sqrtPriceU96 - sqrtPriceX96, FixedPoint64.Q64);
             // △x0 = △x/(a/b +1) = △x*b/(a+b)
             amount0 = FullMath.mulDiv(deltaX, b, a + b);
         }
@@ -48,10 +49,25 @@ library Position {
         if(deltaX > amount0){
             amount1 = FullMath.mulDiv(
                 deltaX.sub(amount0), 
-                FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, FixedPoint96.Q96), 
-                FixedPoint96.Q96
+                FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, FixedPoint64.Q64), 
+                FixedPoint128.Q128
             );
         }
+    }
+
+    /// @notice 计算最小兑换输出值
+    /// @param curPirce 当前价
+    /// @param maxPriceImpact 最大价格影响, 大于1e4就不用验证了
+    /// @param amountIn 输入数里
+    function getAmountOutMin(
+        uint160 curPirce, 
+        uint16 maxPriceImpact, 
+        uint amountIn
+    ) internal pure returns(uint amountOutMin){
+        amountOutMin = FullMath.mulDiv(
+            FullMath.mulDiv(amountIn, FullMath.mulDiv(curPirce, curPirce, FixedPoint64.Q64), FixedPoint128.Q128), 
+            1e4 - maxPriceImpact, 
+            1e4);
     }
 
     struct SwapParams{
@@ -67,6 +83,8 @@ library Position {
         uint24 fee;
         address uniV3Factory;
         address uniV3Router;
+        uint16 maxSqrtSlippage;
+        uint16 maxPriceImpact;
     }
 
     /// @notice 根据基金本币数量以及收集的手续费数量, 计算投资指定头寸两种代币的分布.
@@ -75,18 +93,29 @@ library Position {
         mapping(address => bytes) storage buyPath
     ) internal returns(uint amount0Max, uint amount1Max) {
         uint equalAmount0;
-        uint160 buy0Price;
+        bytes memory buy0Path;
+        bytes memory buy1Path;
+        uint160 buy0SqrtPriceX96;
+        uint160 buy1SqrtPriceX96;
+        uint amountIn;
 
         //将基金本币换算成token0
         if(params.amount > 0){
             if(params.token == params.token0){
+                buy1Path = buyPath[params.token1];
+                buy1SqrtPriceX96 = PathPrice.verifySlippage(buy1Path, params.uniV3Factory, params.maxSqrtSlippage);
                 equalAmount0 = params.amount0.add(params.amount);
             } else {
-                buy0Price = PathPrice.getSqrtPriceX96(buyPath[params.token0], params.uniV3Factory, true);
+                buy0Path = buyPath[params.token0];
+                buy0SqrtPriceX96 = PathPrice.verifySlippage(buy0Path, params.uniV3Factory, params.maxSqrtSlippage);
+                if(params.token != params.token1) {
+                    buy1Path = buyPath[params.token1];
+                    buy1SqrtPriceX96 = PathPrice.verifySlippage(buy1Path, params.uniV3Factory, params.maxSqrtSlippage);
+                }
                 equalAmount0 = params.amount0.add((FullMath.mulDiv(
                     params.amount,
-                    FullMath.mulDiv(buy0Price, buy0Price, FixedPoint96.Q96),
-                    FixedPoint96.Q96
+                    FullMath.mulDiv(buy0SqrtPriceX96, buy0SqrtPriceX96, FixedPoint64.Q64),
+                    FixedPoint128.Q128
                 )));
             }
         } 
@@ -96,8 +125,8 @@ library Position {
         if(params.amount1 > 0){
             equalAmount0 = equalAmount0.add((FullMath.mulDiv(
                 params.amount1,
-                FixedPoint96.Q96,
-                FullMath.mulDiv(params.sqrtPriceX96, params.sqrtPriceX96, FixedPoint96.Q96)
+                FixedPoint128.Q128,
+                FullMath.mulDiv(params.sqrtPriceX96, params.sqrtPriceX96, FixedPoint64.Q64)
             )));
         }
         require(equalAmount0 > 0, "EIZ");
@@ -110,39 +139,41 @@ library Position {
             //t1也不够，基金本币需要兑换成t0和t1
             if(amount1Max > params.amount1){
                 // 基金本币兑换成token0
-                uint fundToT0;
                 if(params.token0 == params.token){
-                    fundToT0 = amount0Max - params.amount0;
-                    if(fundToT0 > params.amount) fundToT0 = params.amount;
-                    amount0Max = params.amount0.add(fundToT0);
+                    amountIn = amount0Max - params.amount0;
+                    if(amountIn > params.amount) amountIn = params.amount;
+                    amount0Max = params.amount0.add(amountIn);
                 } else {
-                    fundToT0 = FullMath.mulDiv(
+                    amountIn = FullMath.mulDiv(
                         amount0Max - params.amount0,
-                        FixedPoint96.Q96,
-                        FullMath.mulDiv(buy0Price, buy0Price, FixedPoint96.Q96)
+                        FixedPoint128.Q128,
+                        FullMath.mulDiv(buy0SqrtPriceX96, buy0SqrtPriceX96, FixedPoint64.Q64)
                     );
-                    if(fundToT0 > params.amount) fundToT0 = params.amount;
-                    if(fundToT0 > 0) {
+                    if(amountIn > params.amount) amountIn = params.amount;
+                    if(amountIn > 0) {
+                        uint amountOutMin = getAmountOutMin(buy0SqrtPriceX96, params.maxPriceImpact, amountIn);
                         amount0Max = params.amount0.add(ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
-                            path: buyPath[params.token0],
+                            path: buy0Path,
                             recipient: address(this),
                             deadline: block.timestamp,
-                            amountIn: fundToT0,
-                            amountOutMinimum: 0
+                            amountIn: amountIn,
+                            amountOutMinimum: amountOutMin
                         })));
                     } else amount0Max = params.amount0;
                 }
                 // 基金本币兑换成token1
                 if(params.token1 == params.token){
-                    amount1Max = params.amount1.add(params.amount.sub(fundToT0));
+                    amount1Max = params.amount1.add(params.amount.sub(amountIn));
                 } else {
-                    if(fundToT0 < params.amount){
+                    if(amountIn < params.amount){
+                        amountIn = params.amount.sub(amountIn);
+                        uint amountOutMin = getAmountOutMin(buy1SqrtPriceX96, params.maxPriceImpact, amountIn);
                         amount1Max = params.amount1.add(ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
-                            path: buyPath[params.token1],
+                            path: buy1Path,
                             recipient: address(this),
                             deadline: block.timestamp,
-                            amountIn: params.amount.sub(fundToT0),
-                            amountOutMinimum: 0
+                            amountIn: amountIn,
+                            amountOutMinimum: amountOutMin
                         })));
                     } 
                     else amount1Max = params.amount1;
@@ -150,60 +181,75 @@ library Position {
             }
             // t1多了，多余的t1需要兑换成t0，基金本币全部兑换成t0
             else {
-                // 多余的t1兑换成t0
-                if(params.amount1 > amount1Max){
-                    amount0Max = params.amount0.add(ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
-                        path: abi.encodePacked(params.token1, params.fee, params.token0),
-                        recipient: address(this),
-                        deadline: block.timestamp,
-                        amountIn: params.amount1.sub(amount1Max),
-                        amountOutMinimum: 0
-                    })));
-                } 
-                else amount0Max = params.amount0;
-
                 // 基金本币全部兑换成t0
                 if (params.amount > 0){
                     if(params.token0 == params.token){
-                        amount0Max = amount0Max.add(params.amount);
+                        amount0Max = params.amount0.add(params.amount);
                     } else{
-                        amount0Max = amount0Max.add(ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
-                            path: buyPath[params.token0],
+                        uint amountOutMin = getAmountOutMin(buy0SqrtPriceX96, params.maxPriceImpact, params.amount);
+                        amount0Max = params.amount0.add(ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
+                            path: buy0Path,
                             recipient: address(this),
                             deadline: block.timestamp,
                             amountIn: params.amount,
-                            amountOutMinimum: 0
+                            amountOutMinimum: amountOutMin
                         })));
                     }
+                } else amount0Max = params.amount0;
+
+                // 多余的t1兑换成t0
+                if(params.amount1 > amount1Max) {
+                    amountIn = params.amount1.sub(amount1Max);
+                    buy0Path = abi.encodePacked(params.token1, params.fee, params.token0);
+                    buy0SqrtPriceX96 = uint160(FixedPoint96.Q96 * FixedPoint96.Q96 / params.sqrtPriceX96);// 不会出现溢出
+                    (uint lastSqrtPriceX96,) = PathPrice.getSqrtPriceX96(buy0Path, params.uniV3Factory, 0x1);
+                    if(lastSqrtPriceX96 > buy0SqrtPriceX96) 
+                        require(buy0SqrtPriceX96 > params.maxSqrtSlippage * lastSqrtPriceX96 / 1e4, "VS");// 不会出现溢出
+                    uint amountOutMin = getAmountOutMin(buy0SqrtPriceX96, params.maxPriceImpact, amountIn);
+                    amount0Max = amount0Max.add(ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
+                        path: buy0Path,
+                        recipient: address(this),
+                        deadline: block.timestamp,
+                        amountIn: amountIn,
+                        amountOutMinimum: amountOutMin
+                    })));
                 }
             }
         }
         // t0多了，多余的t0兑换成t1, 基金本币全部兑换成t1
         else {
-            // 多余的t0兑换成t1
-            if(amount0Max < params.amount0){
-                amount1Max = params.amount1.add(ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
-                    path: abi.encodePacked(params.token0, params.fee, params.token1),
-                    recipient: address(this),
-                    deadline: block.timestamp,
-                    amountIn: params.amount0.sub(amount0Max),
-                    amountOutMinimum: 0
-                })));
-            }
-            else amount1Max = params.amount1;
             // 基金本币全部兑换成t1
             if(params.amount > 0){
                 if(params.token1 == params.token){
-                    amount1Max = amount1Max.add(params.amount);
+                    amount1Max = params.amount1.add(params.amount);
                 } else {
-                    amount1Max = amount1Max.add(ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
-                        path: buyPath[params.token1],
+                    uint amountOutMin = getAmountOutMin(buy1SqrtPriceX96, params.maxPriceImpact, params.amount);
+                    amount1Max = params.amount1.add(ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
+                        path: buy1Path,
                         recipient: address(this),
                         deadline: block.timestamp,
                         amountIn: params.amount,
-                        amountOutMinimum: 0
+                        amountOutMinimum: amountOutMin
                     })));
                 }
+            } else amount1Max = params.amount1;
+
+            // 多余的t0兑换成t1
+            if(params.amount0 > amount0Max){
+                amountIn = params.amount0.sub(amount0Max);
+                buy1Path = abi.encodePacked(params.token0, params.fee, params.token1);
+                buy1SqrtPriceX96 = params.sqrtPriceX96;
+                (uint lastSqrtPriceX96,) = PathPrice.getSqrtPriceX96(buy1Path, params.uniV3Factory, 0x1);
+                if(lastSqrtPriceX96 > buy1SqrtPriceX96) 
+                    require(buy1SqrtPriceX96 > params.maxSqrtSlippage * lastSqrtPriceX96 / 1e4, "VS");// 不会出现溢出
+                uint amountOutMin = getAmountOutMin(buy1SqrtPriceX96, params.maxPriceImpact, amountIn);
+                amount1Max = amount1Max.add(ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
+                    path: buy1Path,
+                    recipient: address(this),
+                    deadline: block.timestamp,
+                    amountIn: amountIn,
+                    amountOutMinimum: amountOutMin
+                })));
             }
         }
     }
@@ -221,6 +267,8 @@ library Position {
         //UNISWAP_V3_ROUTER
         address uniV3Router;
         address uniV3Factory;
+        uint16 maxSqrtSlippage;
+        uint16 maxPriceImpact;
     }
 
     /// @notice 添加LP到指定Position
@@ -233,7 +281,7 @@ library Position {
         AddParams memory params,
         mapping(address => bytes) storage sellPath,
         mapping(address => bytes) storage buyPath
-    ) public {
+    ) public returns(uint128 liquidity) {
         (int24 tickLower, int24 tickUpper) = (self.tickLower, self.tickUpper);
 
         (uint160 sqrtPriceX96,,,,,,) = IUniswapV3Pool(params.pool).slot0();
@@ -250,7 +298,9 @@ library Position {
             token1: IUniswapV3Pool(params.pool).token1(),
             fee: IUniswapV3Pool(params.pool).fee(),
             uniV3Router: params.uniV3Router,
-            uniV3Factory: params.uniV3Factory
+            uniV3Factory: params.uniV3Factory,
+            maxSqrtSlippage: params.maxSqrtSlippage,
+            maxPriceImpact: params.maxPriceImpact
         });
         (params.amount0Max,  params.amount1Max) = computeSwapAmounts(swapParams, buyPath);
 
@@ -258,7 +308,7 @@ library Position {
         (sqrtPriceX96,,,,,,) = IUniswapV3Pool(params.pool).slot0();
 
         //推算实际的liquidity
-        uint128 liquidity = LiquidityAmounts.getLiquidityForAmounts(sqrtPriceX96, swapParams.sqrtRatioAX96, swapParams.sqrtRatioBX96, params.amount0Max, params.amount1Max);
+        liquidity = LiquidityAmounts.getLiquidityForAmounts(sqrtPriceX96, swapParams.sqrtRatioAX96, swapParams.sqrtRatioBX96, params.amount0Max, params.amount1Max);
 
         require(liquidity > 0, "LIZ");
         (uint amount0, uint amount1) = IUniswapV3Pool(params.pool).mint(
@@ -339,6 +389,9 @@ library Position {
         uint proportionX128;
         //UNISWAP_V3_ROUTER
         address uniV3Router;
+        address uniV3Factory;
+        uint16 maxSqrtSlippage;
+        uint16 maxPriceImpact;
     }
 
     /// @notice 减少指定头寸LP，并取回本金本币
@@ -352,29 +405,66 @@ library Position {
     ) public returns(uint amount) {
         address token0 = IUniswapV3Pool(params.pool).token0();
         address token1 = IUniswapV3Pool(params.pool).token1();
+        uint160 sqrtPriceX96;
+        uint160 sqrtPriceX96Last;
+        uint amountOutMin;
+
+        // 验证本池子的滑点
+        if(params.maxSqrtSlippage <= 1e4){
+            // t0到t1的滑点
+            (sqrtPriceX96,,,,,,) = IUniswapV3Pool(params.pool).slot0();
+            uint32[] memory secondAges = new uint32[](2);
+            secondAges[0] = 0;
+            secondAges[1] = 1;
+            (int56[] memory tickCumulatives,) = IUniswapV3Pool(params.pool).observe(secondAges);
+            sqrtPriceX96Last = TickMath.getSqrtRatioAtTick(int24(tickCumulatives[0] - tickCumulatives[1]));
+            if(sqrtPriceX96Last > sqrtPriceX96)
+                require(sqrtPriceX96 > params.maxSqrtSlippage * sqrtPriceX96Last / 1e4, "VS");// 不会出现溢出
+            
+            // t1到t0的滑点
+            sqrtPriceX96 = uint160(FixedPoint96.Q96 * FixedPoint96.Q96 / sqrtPriceX96); // 不会出现溢出
+            sqrtPriceX96Last = uint160(FixedPoint96.Q96 * FixedPoint96.Q96 / sqrtPriceX96Last); 
+            if(sqrtPriceX96Last > sqrtPriceX96)
+                require(sqrtPriceX96 > params.maxSqrtSlippage * sqrtPriceX96Last / 1e4, "VS"); // 不会出现溢出
+        }
+
         // burn & collect
         (uint amount0, uint amount1) = burnAndCollect(self, params.pool, params.proportionX128);
 
-        // 兑换成基金本币
-        if(token0 != params.token && amount0 > 0){
-            amount = ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
-                path: sellPath[token0],
-                recipient: address(this),
-                deadline: block.timestamp,
-                amountIn: amount0,
-                amountOutMinimum: 0
-            }));
+        // t0兑换成基金本币
+        if(token0 != params.token){
+            if(amount0 > 0){
+                bytes memory path = sellPath[token0];
+                if(params.maxSqrtSlippage <= 1e4) {
+                    sqrtPriceX96 = PathPrice.verifySlippage(path, params.uniV3Factory, params.maxSqrtSlippage);
+                    amountOutMin = getAmountOutMin(sqrtPriceX96, params.maxPriceImpact, amount0);    
+                }
+                amount = ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
+                    path: path,
+                    recipient: address(this),
+                    deadline: block.timestamp,
+                    amountIn: amount0,
+                    amountOutMinimum: amountOutMin
+                }));
+            }
         }
 
-        // 兑换成基金本币
-        if(token1 != params.token && amount1 > 0){
-            amount = amount.add(ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
-                path: sellPath[token1],
-                recipient: address(this),
-                deadline: block.timestamp,
-                amountIn: amount1,
-                amountOutMinimum: 0
-            })));
+        // t1兑换成基金本币
+        if(token1 != params.token){
+            if(amount1 > 0){
+                bytes memory path = sellPath[token1];
+                if(params.maxSqrtSlippage <= 1e4) {
+                    sqrtPriceX96 = PathPrice.verifySlippage(path, params.uniV3Factory, params.maxSqrtSlippage);
+                    amountOutMin = getAmountOutMin(sqrtPriceX96, params.maxPriceImpact, amount1);    
+                }
+                amount = amount.add(ISwapRouter(params.uniV3Router).exactInput(ISwapRouter.ExactInputParams({
+                    path: path,
+                    recipient: address(this),
+                    deadline: block.timestamp,
+                    amountIn: amount1,
+                    amountOutMinimum: amountOutMin
+                })));
+            }
         }
     }
 
@@ -409,12 +499,12 @@ library Position {
         if(params.token0 != token){
             bytes memory path = sellPath[params.token0];
             if(path.length == 0) return(amount, amounts);
-            params.price0 = PathPrice.getSqrtPriceX96(path, uniV3Factory, false);
+            (params.price0,) = PathPrice.getSqrtPriceX96(path, uniV3Factory, 0x1);
         }
         if(params.token1 != token){
             bytes memory path = sellPath[params.token1];
             if(path.length == 0) return(amount, amounts);
-            params.price1 = PathPrice.getSqrtPriceX96(path, uniV3Factory, false);
+            (params.price1,) = PathPrice.getSqrtPriceX96(path, uniV3Factory, 0x1);
         }
 
         (params.sqrtPriceX96, params.tick, , , , , ) = IUniswapV3Pool(pool).slot0();
@@ -445,8 +535,8 @@ library Position {
             if(params.token0 != token){
                 _amount = FullMath.mulDiv(
                     _amount0,
-                    FullMath.mulDiv(params.price0, params.price0, FixedPoint96.Q96),
-                    FixedPoint96.Q96);
+                    FullMath.mulDiv(params.price0, params.price0, FixedPoint64.Q64),
+                    FixedPoint128.Q128);
             }
             else
                 _amount = _amount0;
@@ -454,8 +544,8 @@ library Position {
             if(params.token1 != token){
                 _amount = _amount.add(FullMath.mulDiv(
                     _amount1,
-                    FullMath.mulDiv(params.price1, params.price1, FixedPoint96.Q96),
-                    FixedPoint96.Q96));
+                    FullMath.mulDiv(params.price1, params.price1, FixedPoint64.Q64),
+                    FixedPoint128.Q128));
             }
             else
                 _amount = _amount.add(_amount1);
@@ -503,22 +593,22 @@ library Position {
         if(amount0 > 0){
             address token0 = IUniswapV3Pool(pool).token0();
             if(token0 != token){
-                uint160 price0 = PathPrice.getSqrtPriceX96(sellPath[token0], uniV3Factory, false);
+                (uint160 price0,) = PathPrice.getSqrtPriceX96(sellPath[token0], uniV3Factory, 0x1);
                 amount = FullMath.mulDiv(
                     amount0,
-                    FullMath.mulDiv(price0, price0, FixedPoint96.Q96),
-                    FixedPoint96.Q96);
+                    FullMath.mulDiv(price0, price0, FixedPoint64.Q64),
+                    FixedPoint128.Q128);
             } else
                 amount = amount0;
         }
         if(amount1 > 0){
             address token1 = IUniswapV3Pool(pool).token1();
             if(token1 != token){
-                uint160 price1 = PathPrice.getSqrtPriceX96(sellPath[token1], uniV3Factory, false);
+                (uint160 price1,) = PathPrice.getSqrtPriceX96(sellPath[token1], uniV3Factory, 0x1);
                 amount = amount.add(FullMath.mulDiv(
                     amount1,
-                    FullMath.mulDiv(price1, price1, FixedPoint96.Q96),
-                    FixedPoint96.Q96));
+                    FullMath.mulDiv(price1, price1, FixedPoint64.Q64),
+                    FixedPoint128.Q128));
             } else
                 amount = amount.add(amount1);
         }

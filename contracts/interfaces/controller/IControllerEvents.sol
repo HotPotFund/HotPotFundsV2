@@ -18,6 +18,9 @@ interface IControllerEvents {
     /// @notice 当调用setPath时触发
     event SetPath(address indexed fund, address indexed distToken, bytes path);
 
-    /// @notice 当调用setMaxHarvestSlippage时触发
-    event SetMaxHarvestSlippage(uint slippage);
+    /// @notice 当调用setMaxSqrtSlippage时触发
+    event SetMaxSqrtSlippage(uint sqrtSlippage);
+
+    /// @notice 当调用setMaxPriceImpact时触发
+    event SetMaxPriceImpact(uint priceImpact);
 }

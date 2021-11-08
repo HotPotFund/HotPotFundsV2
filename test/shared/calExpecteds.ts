@@ -1,5 +1,5 @@
 import { BigNumber, Contract, Wallet } from 'ethers'
-import { FeeAmount, FixedPoint128, FixedPoint96 } from './constants'
+import { FeeAmount, FixedPoint128, FixedPoint96, FixedPoint64 } from './constants'
 import { decodePath, hasMultiplePools, skipToken } from './path'
 import { computePoolAddress } from './computePoolAddress'
 import { CompleteFixture } from './completeFixture'
@@ -35,17 +35,17 @@ export function getAmountsForAmount0(
   // 部分t0
   else if (sqrtPriceX96.lt(sqrtPriceU96)) {
     // a = SPu*(SPc - SPl)
-    const a96 = sqrtPriceU96.mul(sqrtPriceX96.sub(sqrtPriceL96)).div(FixedPoint96.Q96)
+    const a96 = sqrtPriceU96.mul(sqrtPriceX96.sub(sqrtPriceL96)).div(FixedPoint64.Q64)
     // b = SPc*(SPu - SPc)
-    const b96 = sqrtPriceX96.mul(sqrtPriceU96.sub(sqrtPriceX96)).div(FixedPoint96.Q96)
+    const b96 = sqrtPriceX96.mul(sqrtPriceU96.sub(sqrtPriceX96)).div(FixedPoint64.Q64)
     // △x0 = △x/(a/b +1) = △x*b/(a+b)
     amount0 = deltaX.mul(b96).div(a96.add(b96))
   }
 
   //剩余的转成t1
   if (deltaX.gt(amount0)) {
-    const priceX96 = sqrtPriceX96.mul(sqrtPriceX96).div(FixedPoint96.Q96)
-    amount1 = deltaX.sub(amount0).mul(priceX96).div(FixedPoint96.Q96)
+    const priceX128 = sqrtPriceX96.mul(sqrtPriceX96).div(FixedPoint64.Q64)
+    amount1 = deltaX.sub(amount0).mul(priceX128).div(FixedPoint128.Q128)
   }
 
   return { amount0, amount1 }
@@ -234,14 +234,14 @@ export async function getExpectedAssetsOfPosition(params: AssetsOfPosition, uniV
   let token0 = await pool.token0()
   if (token0.toLowerCase() != params.token.toLowerCase()) {
     let price0 = await getSqrtPriceX96(params.uniV3Factory, await params.hotPotFund.sellPath(token0), params.tickMath, params.wallet, false)
-    amount = amount0.mul(price0.mul(price0).div(FixedPoint96.Q96)).div(FixedPoint96.Q96)
+    amount = amount0.mul(price0.mul(price0).div(FixedPoint64.Q64)).div(FixedPoint128.Q128)
   } else amount = amount0
 
   let token1 = await pool.token1()
   if (token1.toLowerCase() != params.token.toLowerCase()) {
     let price1 = await getSqrtPriceX96(params.uniV3Factory, await params.hotPotFund.sellPath(token1), params.tickMath, params.wallet, false)
     amount = amount.add(
-      amount1.mul(price1.mul(price1).div(FixedPoint96.Q96)).div(FixedPoint96.Q96)
+      amount1.mul(price1.mul(price1).div(FixedPoint64.Q64)).div(FixedPoint128.Q128)
     )
   } else amount = amount.add(amount1)
 

@@ -20,8 +20,13 @@ interface IGovernanceActions {
     /// @param path 路径
     function setHarvestPath(address token, bytes memory path) external;
 
-    /// @notice Set the max slippage for harvest
+    /// @notice Set the max slippage for swap
     /// @dev This function can only be called by governance
-    /// @param slippage 0-100
-    function setMaxHarvestSlippage(uint slippage) external;
+    /// @param sqrtSlippage 0-1e4
+    function setMaxSqrtSlippage(uint16 sqrtSlippage) external;
+
+    /// @notice Set the max price impact for swap
+    /// @dev This function can only be called by governance
+    /// @param priceImpact 0-1e4
+    function setMaxPriceImpact(uint16 priceImpact) external;
 }

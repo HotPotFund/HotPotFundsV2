@@ -27,6 +27,8 @@ interface IManagerActions {
     /// @param tickLower 价格刻度下届
     /// @param tickUpper 价格刻度上届
     /// @param amount 初始化投入金额，允许为0, 为0表示仅初始化头寸，不作实质性投资
+    /// @param deadline 最晚交易时间
+    /// @return liquidity 添加的lp数量
     function init(
         address fund,
         address token0,
@@ -34,8 +36,9 @@ interface IManagerActions {
         uint24 fee,
         int24 tickLower,
         int24 tickUpper,
-        uint amount
-    ) external;
+        uint amount,
+        uint deadline
+    ) external returns(uint128 liquidity);
 
     /// @notice 投资指定头寸，可选复投手续费
     /// @dev This function can only be called by manager 
@@ -44,13 +47,16 @@ interface IManagerActions {
     /// @param positionIndex 头寸索引号
     /// @param amount 投资金额
     /// @param collect 是否收集已产生的手续费并复投
+    /// @param deadline 最晚交易时间
+    /// @return liquidity 添加的lp数量
     function add(
         address fund,
         uint poolIndex,
         uint positionIndex, 
         uint amount, 
-        bool collect
-    ) external;
+        bool collect,
+        uint deadline
+    ) external returns(uint128 liquidity);
 
     /// @notice 撤资指定头寸
     /// @dev This function can only be called by manager 
@@ -58,12 +64,15 @@ interface IManagerActions {
     /// @param poolIndex 池子索引号
     /// @param positionIndex 头寸索引号
     /// @param proportionX128 撤资比例，左移128位; 允许为0，为0表示只收集手续费
+    /// @param deadline 最晚交易时间
+    /// @return amount 撤资获得的基金本币数量
     function sub(
         address fund,
         uint poolIndex,
         uint positionIndex,
-        uint proportionX128
-    ) external;
+        uint proportionX128,
+        uint deadline
+    ) external returns(uint amount);
 
     /// @notice 调整头寸投资
     /// @dev This function can only be called by manager 
@@ -72,11 +81,14 @@ interface IManagerActions {
     /// @param subIndex 要移除的头寸索引号
     /// @param addIndex 要添加的头寸索引号
     /// @param proportionX128 调整比例，左移128位
+    /// @param deadline 最晚交易时间
+    /// @return liquidity 调整后添加的lp数量
     function move(
         address fund,
         uint poolIndex,
         uint subIndex, 
         uint addIndex,
-        uint proportionX128
-    ) external;
+        uint proportionX128,
+        uint deadline
+    ) external returns(uint128 liquidity);
 }

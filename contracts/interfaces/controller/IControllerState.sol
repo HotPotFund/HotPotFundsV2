@@ -27,6 +27,9 @@ interface IControllerState {
     /// @param token 要兑换的代币
     function harvestPath(address token) external view returns (bytes memory);
 
-    /// @notice harvest时最大滑点 0-100
-    function maxHarvestSlippage() external view returns (uint);
+    /// @notice 涉及到swap时最大滑点 0-1e4，这里是sqrt值
+    function maxSqrtSlippage() external view returns (uint16);
+
+    /// @notice 涉及到swap时最大价格影响 0-1e4
+    function maxPriceImpact() external view returns (uint16);
 }

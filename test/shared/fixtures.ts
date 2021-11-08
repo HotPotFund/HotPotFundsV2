@@ -7,9 +7,8 @@ import { expect } from 'chai'
 export const INIT_FOR_TEST_WETH_AMOUNT = expandTo18Decimals(0.4 * 1e4);//cannot be greater than 1e4
 export const INIT_FOR_TEST_TOKEN_AMOUNT_18 = expandTo18Decimals(1e3 * 1e4);
 export const INIT_FOR_TEST_TOKEN_AMOUNT_6 = expandTo6Decimals(1e3 * 1e4);
-export const INIT_PAIR_LP_AMOUNT_18 = expandTo18Decimals(1e2*1e4);
-export const INIT_PAIR_LP_AMOUNT_6 = expandTo6Decimals(1e2*1e4);
-export const INIT_PAIR_LP_AMOUNT_ETH = expandTo18Decimals(1e3);
+export const INIT_PAIR_LP_AMOUNT_18 = expandTo18Decimals(1e3);
+export const INIT_PAIR_LP_AMOUNT_6 = expandTo6Decimals(1e3);
 export const DEFAULT_FEE = FeeAmount.MEDIUM;
 
 

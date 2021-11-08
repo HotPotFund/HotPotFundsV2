@@ -64,6 +64,11 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
         _;
     }
 
+    modifier checkDeadline(uint deadline) {
+        require(block.timestamp <= deadline, 'CDL');
+        _;
+    }
+
     constructor () {
         address _token;
         address _uniV3Router;
@@ -111,7 +116,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
     }
 
     /// @inheritdoc IHotPotV2FundUserActions
-    function withdraw(uint share) external override nonReentrant returns(uint amount) {
+    function withdraw(uint share, uint amountMin, uint deadline) external override checkDeadline(deadline) nonReentrant returns(uint amount) {
         uint balance = balanceOf[msg.sender];
         require(share > 0 && share <= balance, "ISA");
         uint investment = FullMath.mulDiv(investmentOf[msg.sender], share, balance);
@@ -141,7 +146,10 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
                         proportionX128: FullMath.mulDiv(remainingAmount, DIVISOR, desirableAmount),
                         pool: pools[poolIndex],
                         token: fToken,
-                        uniV3Router: uniV3Router
+                        uniV3Router: uniV3Router,
+                        uniV3Factory: uniV3Factory,
+                        maxSqrtSlippage: 10001,
+                        maxPriceImpact: 10001
                     }), sellPath);
                     break;
                 }
@@ -150,7 +158,10 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
                             proportionX128: DIVISOR,
                             pool: pools[poolIndex],
                             token: fToken,
-                            uniV3Router: uniV3Router
+                            uniV3Router: uniV3Router,
+                            uniV3Factory: uniV3Factory,
+                            maxSqrtSlippage: 10001,
+                            maxPriceImpact: 10001
                         }), sellPath);
                     remainingAmount = remainingAmount.sub(desirableAmount);
                     amounts[poolIndex][positionIndex] = 0;
@@ -165,6 +176,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
             else if(totalSupply == share)
                 amount = value;
         }
+        require(amount >= amountMin, 'PSC');
 
         // 处理基金经理分成和基金分成
         if(amount > investment){
@@ -245,10 +257,12 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
         uint24 fee,
         int24 tickLower,
         int24 tickUpper,
-        uint amount
-    ) external override onlyController{
+        uint amount,
+        uint maxPIS
+    ) external override onlyController returns(uint128 liquidity){
         // 1、检查pool是否有效
-        require(tickLower < tickUpper && token0 < token1, "ITV");
+        require(tickLower < tickUpper, "ITV");
+        require(token0 < token1, "ITV");
         address pool = IUniswapV3Factory(uniV3Factory).getPool(token0, token1, fee);
         require(pool != address(0), "ITF");
         int24 tickspacing = IUniswapV3Pool(pool).tickSpacing();
@@ -265,8 +279,9 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
                 poolIndex = i;
                 for(uint positionIndex = 0; positionIndex < positions[i].length; positionIndex++) {
                     // 存在相同的头寸, 退出
-                    if(positions[i][positionIndex].tickLower == tickLower && positions[i][positionIndex].tickUpper == tickUpper)
-                        revert();
+                    if(positions[i][positionIndex].tickLower == tickLower)
+                        if(positions[i][positionIndex].tickUpper == tickUpper)
+                            revert();
                 }
                 break;
             }
@@ -289,7 +304,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
             address fToken = token;
             require(IERC20(fToken).balanceOf(address(this)) >= amount, "ATL");
             Position.Info storage position = positions[poolIndex][positions[poolIndex].length - 1];
-            position.addLiquidity(Position.AddParams({
+            liquidity = position.addLiquidity(Position.AddParams({
                 poolIndex: poolIndex,
                 pool: pool,
                 amount: amount,
@@ -297,7 +312,9 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
                 amount1Max: 0,
                 token: fToken,
                 uniV3Router: uniV3Router,
-                uniV3Factory: uniV3Factory
+                uniV3Factory: uniV3Factory,
+                maxSqrtSlippage: uint16(maxPIS & 0xffff),
+                maxPriceImpact: uint16(maxPIS >> 16)
             }), sellPath, buyPath);
         }
     }
@@ -307,8 +324,9 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
         uint poolIndex,
         uint positionIndex,
         uint amount,
-        bool collect
-    ) external override onlyController {
+        bool collect,
+        uint maxPIS
+    ) external override onlyController returns(uint128 liquidity){
         require(IERC20(token).balanceOf(address(this)) >= amount, "ATL");
         require(poolIndex < pools.length, "IPL");
         require(positionIndex < positions[poolIndex].length, "IPS");
@@ -320,7 +338,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
         // 需要复投?
         if(collect) (amount0Max, amount1Max) = position.burnAndCollect(pool, 0);
 
-        position.addLiquidity(Position.AddParams({
+        liquidity = position.addLiquidity(Position.AddParams({
             poolIndex: poolIndex,
             pool: pool,
             amount: amount,
@@ -328,7 +346,9 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
             amount1Max: amount1Max,
             token: token,
             uniV3Router: uniV3Router,
-            uniV3Factory: uniV3Factory
+            uniV3Factory: uniV3Factory,
+            maxSqrtSlippage: uint16(maxPIS & 0xffff),
+            maxPriceImpact: uint16(maxPIS >> 16)
         }), sellPath, buyPath);
     }
 
@@ -336,16 +356,20 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
     function sub(
         uint poolIndex,
         uint positionIndex,
-        uint proportionX128
-    ) external override onlyController{
+        uint proportionX128,
+        uint maxPIS
+    ) external override onlyController returns(uint amount){
         require(poolIndex < pools.length, "IPL");
         require(positionIndex < positions[poolIndex].length, "IPS");
 
-        positions[poolIndex][positionIndex].subLiquidity(Position.SubParams({
+        amount = positions[poolIndex][positionIndex].subLiquidity(Position.SubParams({
             proportionX128: proportionX128,
             pool: pools[poolIndex],
             token: token,
-            uniV3Router: uniV3Router
+            uniV3Router: uniV3Router,
+            uniV3Factory: uniV3Factory,
+            maxSqrtSlippage: uint16(maxPIS & 0xffff),
+            maxPriceImpact: uint16(maxPIS >> 16)
         }), sellPath);
     }
 
@@ -354,8 +378,9 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
         uint poolIndex,
         uint subIndex,
         uint addIndex,
-        uint proportionX128
-    ) external override onlyController {
+        uint proportionX128,
+        uint maxPIS
+    ) external override onlyController returns(uint128 liquidity){
         require(poolIndex < pools.length, "IPL");
         require(subIndex < positions[poolIndex].length, "ISI");
         require(addIndex < positions[poolIndex].length, "IAI");
@@ -365,7 +390,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
             .burnAndCollect(pools[poolIndex], proportionX128);
 
         // 添加
-        positions[poolIndex][addIndex].addLiquidity(Position.AddParams({
+        liquidity = positions[poolIndex][addIndex].addLiquidity(Position.AddParams({
             poolIndex: poolIndex,
             pool: pools[poolIndex],
             amount: 0,
@@ -373,7 +398,9 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
             amount1Max: amount1Max,
             token: token,
             uniV3Router: uniV3Router,
-            uniV3Factory: uniV3Factory
+            uniV3Factory: uniV3Factory,
+            maxSqrtSlippage: uint16(maxPIS & 0xffff),
+            maxPriceImpact: uint16(maxPIS >> 16)
         }), sellPath, buyPath);
     }
 

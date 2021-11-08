@@ -195,7 +195,8 @@ describe('HotPotV2Fund', () => {
                   token0.address, token1.address, FeeAmount.MEDIUM,
                   getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
                   getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-                  INIT_DEPOSIT_AMOUNT
+                  INIT_DEPOSIT_AMOUNT,
+                  Math.round(new Date().getTime() / 1e3 + 12000)
                 )).to.not.be.reverted
             })
 
@@ -211,6 +212,7 @@ describe('HotPotV2Fund', () => {
                 await expect(fixture.controller.connect(manager).sub(
                   hotPotFund.address,
                   0, 0, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+                  Math.round(new Date().getTime() / 1e3 + 12000),
                   overrides
                 )).to.not.be.reverted
 
@@ -356,7 +358,8 @@ describe('HotPotV2Fund', () => {
               token0.address, token1.address, FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              0
+              0,
+              await fixture.controller.maxSqrtSlippage()
             )).to.be.reverted
         });
 
@@ -367,7 +370,8 @@ describe('HotPotV2Fund', () => {
               hotPotFund.address,
               token0.address, token1.address, FeeAmount.MEDIUM,
               tickLower, tickUpper,
-              0);
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000));
             await expect(tx).to.not.be.reverted;
             await snapshotGasCost(tx);
 
@@ -388,7 +392,8 @@ describe('HotPotV2Fund', () => {
               tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              0
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.be.reverted
         });
 
@@ -399,7 +404,8 @@ describe('HotPotV2Fund', () => {
               token1.address, token0.address, FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              0
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.be.reverted
             //ticks order error
             await expect(fixture.controller.connect(manager).init(
@@ -407,7 +413,8 @@ describe('HotPotV2Fund', () => {
               token0.address, token1.address, FeeAmount.MEDIUM,
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              0
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.be.reverted
         });
 
@@ -418,7 +425,8 @@ describe('HotPotV2Fund', () => {
             const tx = fixture.controller.connect(manager).init(
               hotPotFund.address,
               token0.address, token1.address, FeeAmount.MEDIUM,
-              tickLower, tickUpper, INIT_DEPOSIT_AMOUNT
+              tickLower, tickUpper, INIT_DEPOSIT_AMOUNT,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             );
             await expect(tx).to.not.be.reverted
             await snapshotGasCost(tx);
@@ -442,6 +450,7 @@ describe('HotPotV2Fund', () => {
                   getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
                   getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
                   INIT_DEPOSIT_AMOUNT.div(2),
+                  Math.round(new Date().getTime() / 1e3 + 12000),
                   overrides
                 )).to.not.be.reverted
             })
@@ -454,6 +463,7 @@ describe('HotPotV2Fund', () => {
                   getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
                   getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
                   INIT_DEPOSIT_AMOUNT.div(2),
+                  Math.round(new Date().getTime() / 1e3 + 12000),
                   overrides
                 )).to.be.reverted
             });
@@ -464,7 +474,8 @@ describe('HotPotV2Fund', () => {
                 let tx = fixture.controller.connect(manager).init(
                   hotPotFund.address,
                   token0.address, token1.address, FeeAmount.MEDIUM,
-                  tickLower, tickUpper, INIT_DEPOSIT_AMOUNT.div(2)
+                  tickLower, tickUpper, INIT_DEPOSIT_AMOUNT.div(2),
+                  Math.round(new Date().getTime() / 1e3 + 12000)
                 );
                 await expect(tx).to.not.be.reverted
                 await snapshotGasCost(tx);
@@ -488,7 +499,8 @@ describe('HotPotV2Fund', () => {
                 let tx = fixture.controller.connect(manager).init(
                   hotPotFund.address,
                   tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
-                  tickLower, tickUpper, 0
+                  tickLower, tickUpper, 0,
+                  Math.round(new Date().getTime() / 1e3 + 12000)
                 );
                 await expect(tx).to.not.be.reverted
                 await snapshotGasCost(tx);
@@ -509,7 +521,8 @@ describe('HotPotV2Fund', () => {
                   tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
                   getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
                   getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-                  INIT_DEPOSIT_AMOUNT.div(2)
+                  INIT_DEPOSIT_AMOUNT.div(2),
+                  Math.round(new Date().getTime() / 1e3 + 12000)
                 );
                 await expect(tx).to.not.be.reverted
                 await snapshotGasCost(tx);
@@ -548,7 +561,8 @@ describe('HotPotV2Fund', () => {
               token0.address, token1.address, FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              0
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted
             // init positions[0][1]: t0+t1
             await expect(fixture.controller.connect(manager).init(
@@ -556,7 +570,8 @@ describe('HotPotV2Fund', () => {
               token0.address, token1.address, FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM])+TICK_SPACINGS[FeeAmount.MEDIUM] * 10,
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM])-TICK_SPACINGS[FeeAmount.MEDIUM] * 10,
-              0
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted
             // init positions[1][0]: fund+t0
             let tokens = sortedTokens(investToken, token0);
@@ -565,7 +580,8 @@ describe('HotPotV2Fund', () => {
               tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              0
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted
             // init positions[2][0]: fund+t1
             tokens = sortedTokens(investToken, token1);
@@ -574,7 +590,8 @@ describe('HotPotV2Fund', () => {
               tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              0
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted
             expect(await hotPotFund.poolsLength()).to.eq(3);
             expect(await hotPotFund.positionsLength(0)).to.eq(2);
@@ -585,12 +602,14 @@ describe('HotPotV2Fund', () => {
         it("1.1 fails if action isn't called by controller", async () => {
             await expect(hotPotFund.connect(manager).add(
               0, 0, INIT_DEPOSIT_AMOUNT, true,
+              await fixture.controller.maxSqrtSlippage(),
               overrides
             )).to.be.reverted
 
             await expect(fixture.controller.connect(manager).add(
               hotPotFund.address,
               0, 0, INIT_DEPOSIT_AMOUNT, true,
+              Math.round(new Date().getTime() / 1e3 + 12000),
               overrides
             )).to.not.be.reverted
         });
@@ -599,11 +618,13 @@ describe('HotPotV2Fund', () => {
             await expect(fixture.controller.connect(manager).add(
               hotPotFund.address,
               3, 0, INIT_DEPOSIT_AMOUNT, true,
+              Math.round(new Date().getTime() / 1e3 + 12000),
               overrides
             )).to.be.reverted
             await expect(fixture.controller.connect(manager).add(
               hotPotFund.address,
               0, 2, INIT_DEPOSIT_AMOUNT, true,
+              Math.round(new Date().getTime() / 1e3 + 12000),
               overrides
             )).to.be.reverted
         })
@@ -612,27 +633,43 @@ describe('HotPotV2Fund', () => {
             await expect(fixture.controller.connect(manager).add(
               hotPotFund.address,
               0, 0, INIT_DEPOSIT_AMOUNT.add(BigNumber.from(1)), false,
+              Math.round(new Date().getTime() / 1e3 + 12000),
               overrides
             )).to.be.reverted
             //amount==0
             await expect(fixture.controller.connect(manager).add(
               hotPotFund.address,
               0, 0, 0, false,
+              Math.round(new Date().getTime() / 1e3 + 12000),
               overrides
             )).to.be.reverted
             //fee==0
             await expect(fixture.controller.connect(manager).add(
               hotPotFund.address,
               0, 0, 0, true,
+              Math.round(new Date().getTime() / 1e3 + 12000),
               overrides
             )).to.be.reverted
         })
+
+        it('fail if the price impact is too big', async() => {
+            await expect(fixture.controller.connect(governance).setMaxPriceImpact(10))
+              .to.emit(fixture.controller, "SetMaxPriceImpact").withArgs(10);
+
+            await expect(fixture.controller.connect(manager).add(
+              hotPotFund.address,
+              1, 0, INIT_DEPOSIT_AMOUNT, false,
+              Math.round(new Date().getTime() / 1e3 + 12000),
+              overrides
+            )).to.be.revertedWith("Too little received")
+        });
 
         it("works", async() => {
             await showAssetStatus("init status：");
             let tx = fixture.controller.connect(manager).add(
               hotPotFund.address,
               0, 0, INIT_DEPOSIT_AMOUNT.div(4), false,
+              Math.round(new Date().getTime() / 1e3 + 12000),
               overrides
             );
             await expect(tx).to.not.be.reverted
@@ -643,6 +680,7 @@ describe('HotPotV2Fund', () => {
             tx = fixture.controller.connect(manager).add(
               hotPotFund.address,
               0, 1, INIT_DEPOSIT_AMOUNT.div(4), false,
+              Math.round(new Date().getTime() / 1e3 + 12000),
               overrides
             );
             await expect(tx).to.not.be.reverted
@@ -653,6 +691,7 @@ describe('HotPotV2Fund', () => {
             tx = fixture.controller.connect(manager).add(
               hotPotFund.address,
               1, 0, INIT_DEPOSIT_AMOUNT.div(4), false,
+              Math.round(new Date().getTime() / 1e3 + 12000),
               overrides
             );
             await expect(tx).to.not.be.reverted
@@ -663,6 +702,7 @@ describe('HotPotV2Fund', () => {
             tx = fixture.controller.connect(manager).add(
               hotPotFund.address,
               2, 0, INIT_DEPOSIT_AMOUNT.div(4), false,
+              Math.round(new Date().getTime() / 1e3 + 12000),
               overrides
             );
             await expect(tx).to.not.be.reverted
@@ -694,7 +734,8 @@ describe('HotPotV2Fund', () => {
               token0.address, token1.address, FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              INIT_DEPOSIT_AMOUNT.div(4)
+              INIT_DEPOSIT_AMOUNT.div(4),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted
             // init positions[0][1]: t0+t1
             await expect(fixture.controller.connect(manager).init(
@@ -702,7 +743,8 @@ describe('HotPotV2Fund', () => {
               token0.address, token1.address, FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]) + TICK_SPACINGS[FeeAmount.MEDIUM] * 10,
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]) - TICK_SPACINGS[FeeAmount.MEDIUM] * 10,
-              INIT_DEPOSIT_AMOUNT.div(4)
+              INIT_DEPOSIT_AMOUNT.div(4),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted
             // init positions[1][0]: fund+t0
             let tokens = sortedTokens(investToken, token0);
@@ -711,7 +753,8 @@ describe('HotPotV2Fund', () => {
               tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              INIT_DEPOSIT_AMOUNT.div(4)
+              INIT_DEPOSIT_AMOUNT.div(4),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted
             // init positions[2][0]: fund+t1
             tokens = sortedTokens(investToken, token1);
@@ -720,7 +763,8 @@ describe('HotPotV2Fund', () => {
               tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              INIT_DEPOSIT_AMOUNT.div(4)
+              INIT_DEPOSIT_AMOUNT.div(4),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted
             expect(await hotPotFund.poolsLength()).to.eq(3);
             expect(await hotPotFund.positionsLength(0)).to.eq(2);
@@ -731,12 +775,14 @@ describe('HotPotV2Fund', () => {
         it("1.1 fails if action isn't called by controller", async () => {
             await expect(hotPotFund.connect(manager).sub(
               0, 0, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              await fixture.controller.maxSqrtSlippage(),
               overrides
             )).to.be.reverted
 
             await expect(fixture.controller.connect(manager).sub(
               hotPotFund.address,
               0, 0, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000),
               overrides
             )).to.not.be.reverted
         });
@@ -746,12 +792,14 @@ describe('HotPotV2Fund', () => {
             await expect(fixture.controller.connect(manager).sub(
               hotPotFund.address,
               3, 0, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000),
               overrides
             )).to.be.reverted
             //invalid position index
             await expect(fixture.controller.connect(manager).sub(
               hotPotFund.address,
               0, 2, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000),
               overrides
             )).to.be.reverted
         })
@@ -760,6 +808,7 @@ describe('HotPotV2Fund', () => {
             await expect(fixture.controller.connect(manager).sub(
               hotPotFund.address,
               0, 0, BigNumber.from(101).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000),
               overrides
             )).to.be.reverted
         })
@@ -769,6 +818,7 @@ describe('HotPotV2Fund', () => {
             let tx = fixture.controller.connect(manager).sub(
               hotPotFund.address,
               0, 0, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             );
             await expect(tx).to.not.be.reverted
             await snapshotGasCost(tx);
@@ -779,6 +829,7 @@ describe('HotPotV2Fund', () => {
             tx = fixture.controller.connect(manager).sub(
               hotPotFund.address,
               0, 1, BigNumber.from(50).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             );
             await expect(tx).to.not.be.reverted
             await snapshotGasCost(tx);
@@ -789,6 +840,7 @@ describe('HotPotV2Fund', () => {
             tx = fixture.controller.connect(manager).sub(
               hotPotFund.address,
               1, 0, BigNumber.from(50).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             );
             await expect(tx).to.not.be.reverted
             await snapshotGasCost(tx);
@@ -799,6 +851,7 @@ describe('HotPotV2Fund', () => {
             tx = fixture.controller.connect(manager).sub(
               hotPotFund.address,
               1, 0, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             );
             await expect(tx).to.not.be.reverted
             await snapshotGasCost(tx);
@@ -828,7 +881,8 @@ describe('HotPotV2Fund', () => {
               token0.address, token1.address, FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              INIT_DEPOSIT_AMOUNT.div(4)
+              INIT_DEPOSIT_AMOUNT.div(4),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted
             // init positions[0][1]: t0+t1
             await expect(fixture.controller.connect(manager).init(
@@ -836,7 +890,8 @@ describe('HotPotV2Fund', () => {
               token0.address, token1.address, FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]) + TICK_SPACINGS[FeeAmount.MEDIUM] * 10,
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]) - TICK_SPACINGS[FeeAmount.MEDIUM] * 10,
-              INIT_DEPOSIT_AMOUNT.div(4)
+              INIT_DEPOSIT_AMOUNT.div(4),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted
 
             // init positions[1][0]: fund+t0
@@ -846,7 +901,8 @@ describe('HotPotV2Fund', () => {
               tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              INIT_DEPOSIT_AMOUNT.div(4)
+              INIT_DEPOSIT_AMOUNT.div(4),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted
             // init positions[1][1]: fund+t0
             await expect(fixture.controller.connect(manager).init(
@@ -854,7 +910,8 @@ describe('HotPotV2Fund', () => {
               tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]) + TICK_SPACINGS[FeeAmount.MEDIUM] * 10,
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]) - TICK_SPACINGS[FeeAmount.MEDIUM] * 10,
-              INIT_DEPOSIT_AMOUNT.div(4)
+              INIT_DEPOSIT_AMOUNT.div(4),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted
             expect(await hotPotFund.poolsLength()).to.eq(2);
             expect(await hotPotFund.positionsLength(0)).to.eq(2);
@@ -864,11 +921,13 @@ describe('HotPotV2Fund', () => {
         it("1.1 fails if action isn't called by controller", async () => {
             await expect(hotPotFund.connect(manager).move(
               0, 0, 1, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              await fixture.controller.maxSqrtSlippage(),
             )).to.be.reverted
 
             await expect(fixture.controller.connect(manager).move(
               hotPotFund.address,
               0, 0, 1, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000),
               overrides
             )).to.not.be.reverted
         });
@@ -878,18 +937,21 @@ describe('HotPotV2Fund', () => {
             await expect(fixture.controller.connect(manager).move(
               hotPotFund.address,
               3, 0, 1, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.be.reverted
 
             //invalid subIndex
             await expect(fixture.controller.connect(manager).move(
               hotPotFund.address,
               0, 2, 1, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.be.reverted
 
             //invalid addIndex
             await expect(fixture.controller.connect(manager).move(
               hotPotFund.address,
               0, 0, 2, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.be.reverted
         })
 
@@ -897,6 +959,7 @@ describe('HotPotV2Fund', () => {
             await expect(fixture.controller.connect(manager).move(
               hotPotFund.address,
               0, 0, 1, BigNumber.from(101).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.be.reverted
         })
 
@@ -906,6 +969,7 @@ describe('HotPotV2Fund', () => {
             let tx = fixture.controller.connect(manager).move(
               hotPotFund.address,
               0, 0, 1, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             );
             await expect(tx).to.not.be.reverted
             await snapshotGasCost(tx);
@@ -917,6 +981,7 @@ describe('HotPotV2Fund', () => {
             tx = fixture.controller.connect(manager).move(
               hotPotFund.address,
               1, 0, 1, BigNumber.from(50).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             );
             await expect(tx).to.not.be.reverted
             await snapshotGasCost(tx);
@@ -928,6 +993,7 @@ describe('HotPotV2Fund', () => {
             tx = fixture.controller.connect(manager).move(
               hotPotFund.address,
               1, 0, 1, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             );
             await expect(tx).to.not.be.reverted
             await snapshotGasCost(tx);
@@ -1073,7 +1139,8 @@ describe('HotPotV2Fund', () => {
               hotPotFund.address,
               token0.address, token1.address, FeeAmount.MEDIUM,
               ticks.tickLower, ticks.tickUpper,
-              0
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted
             // init positions[0][1]: t0+t1 position
             await expect(fixture.controller.connect(manager).init(
@@ -1081,7 +1148,8 @@ describe('HotPotV2Fund', () => {
               token0.address, token1.address, FeeAmount.MEDIUM,
               ticks.tickLower + TICK_SPACINGS[FeeAmount.MEDIUM] * 10,
               ticks.tickUpper - TICK_SPACINGS[FeeAmount.MEDIUM] * 10,
-              0
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted
             // init positions[1][0]: fund+t0 position
             // ticks = await getMyTicks((await fundT0Pool.slot0()).sqrtPriceX96, 50);
@@ -1090,7 +1158,8 @@ describe('HotPotV2Fund', () => {
               hotPotFund.address,
               tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
               ticks.tickLower, ticks.tickUpper,
-              0
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted
             // init positions[2][0]:: fund+t1 position
             // ticks = await getMyTicks((await fundT1Pool.slot0()).sqrtPriceX96, 50);
@@ -1099,7 +1168,8 @@ describe('HotPotV2Fund', () => {
               hotPotFund.address,
               tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
               ticks.tickLower, ticks.tickUpper,
-              0
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted
             expect(await hotPotFund.poolsLength()).to.eq(3);
             expect(await hotPotFund.positionsLength(0)).to.eq(2);
@@ -1109,9 +1179,9 @@ describe('HotPotV2Fund', () => {
 
         it("1 share > 0 && share <= balance", async () => {
             const share = await hotPotFund.balanceOf(depositor.address);
-            await expect(hotPotFund.connect(depositor).withdraw(0))
+            await expect(hotPotFund.connect(depositor).withdraw(0, 5, Math.round(new Date().getTime() / 1e3 + 12000)))
               .to.be.revertedWith("ISA");
-            await expect(hotPotFund.connect(depositor).withdraw(share.add(1)))
+            await expect(hotPotFund.connect(depositor).withdraw(share.add(1), 5, Math.round(new Date().getTime() / 1e3 + 12000)))
               .to.be.revertedWith("ISA");
         })
 
@@ -1121,7 +1191,8 @@ describe('HotPotV2Fund', () => {
                 const balanceBefore = await depositor.getBalance();
                 const removeToUserAmount = INIT_DEPOSIT_AMOUNT;
 
-                const transaction = await hotPotFund.connect(depositor).withdraw(share, overrides);
+                const transaction = await hotPotFund.connect(depositor).withdraw(share, 5,
+                  Math.round(new Date().getTime() / 1e3 + 12000), overrides);
                 const gasFee = transaction.gasLimit.mul(transaction.gasPrice);
                 const balanceAfter = await depositor.getBalance();
 
@@ -1136,11 +1207,44 @@ describe('HotPotV2Fund', () => {
             }
         })
 
+        it("fail if the slippage is too big", async() => {
+            await expect(fixture.controller.connect(governance).setMaxPriceImpact(200))
+              .to.emit(fixture.controller, "SetMaxPriceImpact").withArgs(200);
+            await expect(fixture.controller.add(
+              hotPotFund.address,
+              1, 0, INIT_DEPOSIT_AMOUNT.mul(2), false,
+              Math.round(new Date().getTime() / 1e3 + 12000),
+              overrides
+            )).to.not.be.reverted
+
+            //mock too large slippage withdraw
+            const share = await hotPotFund.balanceOf(depositor.address);
+            const swapAmount = await token0.decimals() == 18 ? INIT_DEPOSIT_AMOUNT_18 : INIT_DEPOSIT_AMOUNT_6;
+            await token0.connect(depositor).transfer(fixture.testSlippage.address, swapAmount);
+            await hotPotFund.connect(depositor).transfer(fixture.testSlippage.address, share);
+            await expect(fixture.testSlippage.withdraw(
+              token0.address, swapAmount, encodePath([token0.address, investToken.address], [FeeAmount.MEDIUM]),
+              hotPotFund.address, share, INIT_DEPOSIT_AMOUNT)
+            ).to.be.revertedWith('PSC');
+            //user allow slippage value
+            await expect(fixture.testSlippage.withdraw(
+              token0.address, swapAmount, encodePath([token0.address, investToken.address], [FeeAmount.MEDIUM]),
+              hotPotFund.address, share, INIT_DEPOSIT_AMOUNT.mul(1e3 - 10).div(1e3))
+            ).to.not.be.reverted;
+        });
+
+        it('fail if the deadline expires', async () => {
+            const share = await hotPotFund.balanceOf(depositor.address)
+            await expect(hotPotFund.connect(depositor).withdraw(
+              share, 5, Math.floor(new Date().getTime() / 1e3 - 12000))
+            ).to.be.revertedWith('CDL')
+        });
+
         describe("works", ()=>{
             it("withdraw immediately after deposit", async () =>{
                 const share = await hotPotFund.balanceOf(depositor.address);
                 const removeToUserAmount = INIT_DEPOSIT_AMOUNT;
-                const tx = hotPotFund.connect(depositor).withdraw(share, overrides);
+                const tx = hotPotFund.connect(depositor).withdraw(share, 1, Math.round(new Date().getTime() / 1e3 + 12000), overrides);
                 await expect(tx)
                     //burn share
                     .to.emit(hotPotFund, "Transfer")
@@ -1169,6 +1273,7 @@ describe('HotPotV2Fund', () => {
                 await expect(fixture.controller.add(
                   hotPotFund.address,
                   0, 0, sumFundAmount.mul(1).div(10), false,
+                  Math.round(new Date().getTime() / 1e3 + 12000),
                   overrides
                 )).to.not.be.reverted
                 await showAssetStatus("add [0][0] 1/10：");
@@ -1176,7 +1281,8 @@ describe('HotPotV2Fund', () => {
 
                 await expect(fixture.controller.add(
                   hotPotFund.address,
-                  0, 1, sumFundAmount.mul(2).div(10), false
+                  0, 1, sumFundAmount.mul(2).div(10), false,
+                  Math.round(new Date().getTime() / 1e3 + 12000)
                 )).to.not.be.reverted
                 await showAssetStatus("add [0][1] 2/10：");
                 funds = await showAddLavePercent(sumFundAmount.mul(2).div(10), funds);
@@ -1184,14 +1290,16 @@ describe('HotPotV2Fund', () => {
                 await expect(
                   fixture.controller.add(
                   hotPotFund.address,
-                  1, 0, sumFundAmount.mul(3).div(10), false
+                  1, 0, sumFundAmount.mul(3).div(10), false,
+                  Math.round(new Date().getTime() / 1e3 + 12000)
                 )).to.not.be.reverted
                 await showAssetStatus("add [1][0] 3/10：");
                 funds = await showAddLavePercent(sumFundAmount.mul(3).div(10), funds);
 
                 await expect(fixture.controller.add(
                   hotPotFund.address,
-                  2, 0, sumFundAmount.mul(4).div(10), false
+                  2, 0, sumFundAmount.mul(4).div(10), false,
+                  Math.round(new Date().getTime() / 1e3 + 12000)
                 )).to.not.be.reverted
                 await showAssetStatus("add [2][0] 4/10：");
                 funds = await showAddLavePercent(sumFundAmount.mul(4).div(10), funds);
@@ -1230,7 +1338,7 @@ describe('HotPotV2Fund', () => {
                     manager
                 );
 
-                let tx = hotPotFund.connect(depositor).withdraw(shareAmount, overrides);
+                let tx = hotPotFund.connect(depositor).withdraw(shareAmount, 1, Math.round(new Date().getTime() / 1e3 + 12000), overrides);
                 await expect(tx)
                   //burn share
                   .to.emit(hotPotFund, "Transfer")
@@ -1266,7 +1374,7 @@ describe('HotPotV2Fund', () => {
                 await expect(await hotPotFund.balanceOf(depositor.address)).to.eq(userTotalShare.sub(shareAmount));
 
                 //depositor2 withdraw all
-                tx = hotPotFund.connect(depositor2).withdraw(await hotPotFund.balanceOf(depositor2.address));
+                tx = hotPotFund.connect(depositor2).withdraw(await hotPotFund.balanceOf(depositor2.address), 1, Math.round(new Date().getTime() / 1e3 + 12000));
                 await expect(tx).to.not.be.reverted;
                 await snapshotGasCost(tx);
                 await showAssetStatus("depositor2 withdraw：");

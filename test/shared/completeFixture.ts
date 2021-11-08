@@ -13,7 +13,7 @@ import {
 } from '../../typechain'
 import { IHotPot } from '../../typechain/IHotPot'
 import { IQuoter } from '../../typechain/IQuoter'
-import {TestHarvest} from "../../typechain/TestHarvest";
+import { TestSwapSlippage } from '../../typechain/TestSwapSlippage'
 
 
 export async function controllerFixture(params: {
@@ -61,7 +61,7 @@ export interface CompleteFixture {
   positionLib: string,
   fundByteCode: string,
   quoter: IQuoter,
-  testHarvest: TestHarvest,
+  testSlippage: TestSwapSlippage,
   tickMath: TickMathTest
 }
 
@@ -130,8 +130,8 @@ async function completeFixture(wallets: Wallet[],
 
   const tickMathFactory = await ethers.getContractFactory('TickMathTest')
   const tickMath = (await tickMathFactory.deploy()) as TickMathTest
-  const testHarvestFactory = await ethers.getContractFactory('TestHarvest')
-  const testHarvest = await testHarvestFactory.deploy(controller.address) as TestHarvest
+  const testSlippageFactory = await ethers.getContractFactory('TestSwapSlippage')
+  const testSlippage = await testSlippageFactory.deploy(controller.address) as TestSwapSlippage
 
   return {
     weth9,
@@ -146,7 +146,7 @@ async function completeFixture(wallets: Wallet[],
     positionLib,
     fundByteCode,
     quoter,
-    testHarvest,
+    testSlippage,
     tickMath
   }
 }

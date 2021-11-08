@@ -3,7 +3,7 @@ import { constants, Contract, utils, Wallet } from 'ethers'
 import { getMaxTick, getMinTick } from './ticks'
 import { FeeAmount, TICK_SPACINGS } from './constants'
 import { encodePriceSqrt, sortedTokens } from './utils'
-import { DEFAULT_FEE, INIT_PAIR_LP_AMOUNT_6, INIT_PAIR_LP_AMOUNT_ETH } from './fixtures'
+import { DEFAULT_FEE, INIT_PAIR_LP_AMOUNT_6, INIT_PAIR_LP_AMOUNT_18 } from './fixtures'
 import poolAtAddress from './poolAtAddress'
 import { computePoolAddress } from './computePoolAddress'
 import HotPotV2FundAbi from '../../artifacts/contracts/HotPotV2Fund.sol/HotPotV2Fund.json'
@@ -23,10 +23,8 @@ export async function createUniV3PoolAndInit(miner: Wallet,
   await token1.approve(fixture.nft.address, 0);
   await token1.approve(fixture.nft.address, constants.MaxUint256);
 
-  let amount0 = await token0.decimals() == 18 ? INIT_PAIR_LP_AMOUNT_ETH : INIT_PAIR_LP_AMOUNT_6
-  let amount1 = await token1.decimals() == 18 ? INIT_PAIR_LP_AMOUNT_ETH : INIT_PAIR_LP_AMOUNT_6;
-  if (token0.address == fixture.weth9.address) amount0 = INIT_PAIR_LP_AMOUNT_ETH;
-  if (token1.address == fixture.weth9.address) amount1 = INIT_PAIR_LP_AMOUNT_ETH
+  let amount0 = await token0.decimals() == 18 ? INIT_PAIR_LP_AMOUNT_18 : INIT_PAIR_LP_AMOUNT_6
+  let amount1 = await token1.decimals() == 18 ? INIT_PAIR_LP_AMOUNT_18 : INIT_PAIR_LP_AMOUNT_6;
 
   const sqrtPriceX96 = encodePriceSqrt(amount1, amount0);
   const tickLower = getMinTick(TICK_SPACINGS[DEFAULT_FEE]);

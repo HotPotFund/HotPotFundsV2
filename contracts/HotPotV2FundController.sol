@@ -19,7 +19,7 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
     address public override immutable hotpot;
     address public override governance;
     address public override immutable WETH9;
-    uint public override maxHarvestSlippage = 20;//0-100
+    uint32 maxPIS = (100 << 16) + 9974;// MaxPriceImpact: 1%, MaxSwapSlippage: 0.5% = (1 - 0.9974 * 0.9974) * 100%
 
     mapping (address => bool) public override verifiedToken;
     mapping (address => bytes) public override harvestPath;
@@ -31,6 +31,11 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
 
     modifier onlyGovernance{
         require(msg.sender == governance, "OGC");
+        _;
+    }
+
+    modifier checkDeadline(uint deadline) {
+        require(block.timestamp <= deadline, 'CDL');
         _;
     }
 
@@ -46,6 +51,16 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
         uniV3Router = _uniV3Router;
         uniV3Factory = _uniV3Factory;
         WETH9 = _weth9;
+    }
+
+    /// @inheritdoc IControllerState
+    function maxPriceImpact() external override view returns(uint16 priceImpact){
+        return uint16(maxPIS >> 16);
+    }
+
+    /// @inheritdoc IControllerState
+    function maxSqrtSlippage() external override view returns(uint16 sqrtSlippage){
+        return uint16(maxPIS & 0xffff);
     }
 
     /// @inheritdoc IGovernanceActions
@@ -74,26 +89,28 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
     }
 
     /// @inheritdoc IGovernanceActions
-    function setMaxHarvestSlippage(uint slippage) external override onlyGovernance {
-        require(slippage <= 100 ,"SMS");
-        maxHarvestSlippage = slippage;
-        emit SetMaxHarvestSlippage(slippage);
+    function setMaxPriceImpact(uint16 priceImpact) external override onlyGovernance {
+        require(priceImpact <= 1e4 ,"SPI");
+        maxPIS = (uint32(priceImpact) << 16) | (maxPIS & 0xffff);
+        emit SetMaxPriceImpact(priceImpact);
+    }
+
+    /// @inheritdoc IGovernanceActions
+    function setMaxSqrtSlippage(uint16 sqrtSlippage) external override onlyGovernance {
+        require(sqrtSlippage <= 1e4 ,"SSS");
+        maxPIS = maxPIS & 0xffff0000 | sqrtSlippage;
+        emit SetMaxSqrtSlippage(sqrtSlippage);
     }
 
     /// @inheritdoc IHotPotV2FundController
     function harvest(address token, uint amount) external override returns(uint burned) {
+        bytes memory path = harvestPath[token];
+        PathPrice.verifySlippage(path, uniV3Factory, uint16(maxPIS & 0xffff));
         uint value = amount <= IERC20(token).balanceOf(address(this)) ? amount : IERC20(token).balanceOf(address(this));
         TransferHelper.safeApprove(token, uniV3Router, value);
 
-        uint curPirce = PathPrice.getSqrtPriceX96(harvestPath[token], uniV3Factory, true);
-        uint lastPrice = PathPrice.getSqrtPriceX96(harvestPath[token], uniV3Factory, false);
-        if(lastPrice > curPirce) {
-            lastPrice = FullMath.mulDiv(lastPrice, lastPrice, FixedPoint96.Q96);
-            require(FullMath.mulDiv(lastPrice - FullMath.mulDiv(curPirce, curPirce, FixedPoint96.Q96), 100, lastPrice) <= maxHarvestSlippage, "MHS");
-        }
-        
         ISwapRouter.ExactInputParams memory args = ISwapRouter.ExactInputParams({
-            path: harvestPath[token],
+            path: path,
             recipient: address(this),
             deadline: block.timestamp,
             amountIn: value,
@@ -177,9 +194,10 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
         uint24 fee,
         int24 tickLower,
         int24 tickUpper,
-        uint amount
-    ) external override onlyManager(fund){
-        IHotPotV2Fund(fund).init(token0, token1, fee, tickLower, tickUpper, amount);
+        uint amount,
+        uint deadline
+    ) external override checkDeadline(deadline) onlyManager(fund) returns(uint128 liquidity){
+        return IHotPotV2Fund(fund).init(token0, token1, fee, tickLower, tickUpper, amount, maxPIS);
     }
 
     /// @inheritdoc IManagerActions
@@ -188,9 +206,10 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
         uint poolIndex,
         uint positionIndex,
         uint amount,
-        bool collect
-    ) external override onlyManager(fund){
-        IHotPotV2Fund(fund).add(poolIndex, positionIndex, amount, collect);
+        bool collect,
+        uint deadline
+    ) external override checkDeadline(deadline) onlyManager(fund) returns(uint128 liquidity){
+        return IHotPotV2Fund(fund).add(poolIndex, positionIndex, amount, collect, maxPIS);
     }
 
     /// @inheritdoc IManagerActions
@@ -198,9 +217,10 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
         address fund,
         uint poolIndex,
         uint positionIndex,
-        uint proportionX128
-    ) external override onlyManager(fund){
-        IHotPotV2Fund(fund).sub(poolIndex, positionIndex, proportionX128);
+        uint proportionX128,
+        uint deadline
+    ) external override checkDeadline(deadline) onlyManager(fund) returns(uint amount){
+        return IHotPotV2Fund(fund).sub(poolIndex, positionIndex, proportionX128, maxPIS);
     }
 
     /// @inheritdoc IManagerActions
@@ -209,8 +229,9 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
         uint poolIndex,
         uint subIndex,
         uint addIndex,
-        uint proportionX128
-    ) external override onlyManager(fund){
-        IHotPotV2Fund(fund).move(poolIndex, subIndex, addIndex, proportionX128);
+        uint proportionX128,
+        uint deadline
+    ) external override checkDeadline(deadline) onlyManager(fund) returns(uint128 liquidity){
+        return IHotPotV2Fund(fund).move(poolIndex, subIndex, addIndex, proportionX128, maxPIS);
     }
 }

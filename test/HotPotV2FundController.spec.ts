@@ -95,7 +95,8 @@ describe('HotPotV2FundController', () => {
         await expect(await fixture.controller.hotpot()).to.eq(fixture.tokenHotPot.address);
         await expect(await fixture.controller.WETH9()).to.eq(fixture.weth9.address);
         await expect(await fixture.controller.governance()).to.eq(governance.address);
-        await expect(await fixture.controller.maxHarvestSlippage()).to.eq(20);
+        await expect(await fixture.controller.maxPriceImpact()).to.eq(100);
+        await expect(await fixture.controller.maxSqrtSlippage()).to.eq(9974);
     });
 
     it('setGovernance', async () => {
@@ -171,26 +172,49 @@ describe('HotPotV2FundController', () => {
         });
     })
 
-    describe('#setMaxHarvestSlippage', () => {
+    describe('#setMaxSqrtSlippage', () => {
         it("fail if it's not a action called by governance", async () => {
-            await expect(fixture.controller.connect(depositor).setMaxHarvestSlippage(30))
+            await expect(fixture.controller.connect(depositor).setMaxSqrtSlippage(30))
               .to.be.revertedWith("OGC");
         });
 
-        it("fail if slippage > 100", async () => {
-            await expect(fixture.controller.connect(governance).setMaxHarvestSlippage(101))
-              .to.be.revertedWith("SMS");
+        it("fail if slippage > 10000", async () => {
+            await expect(fixture.controller.connect(governance).setMaxSqrtSlippage(10001))
+              .to.be.revertedWith("SSS");
         });
-        it("works if slippage <= 100", async () => {
-            await expect(fixture.controller.connect(governance).setMaxHarvestSlippage(0))
-              .to.emit(fixture.controller, "SetMaxHarvestSlippage").withArgs(0);
-            await expect(await fixture.controller.maxHarvestSlippage()).to.eq(0);
-            await expect(fixture.controller.connect(governance).setMaxHarvestSlippage(30))
-              .to.emit(fixture.controller, "SetMaxHarvestSlippage").withArgs(30);
-            await expect(await fixture.controller.maxHarvestSlippage()).to.eq(30);
-            await expect(fixture.controller.connect(governance).setMaxHarvestSlippage(100))
-              .to.emit(fixture.controller, "SetMaxHarvestSlippage").withArgs(100);
-            await expect(await fixture.controller.maxHarvestSlippage()).to.eq(100);
+        it("works if slippage <= 10000", async () => {
+            await expect(fixture.controller.connect(governance).setMaxSqrtSlippage(0))
+              .to.emit(fixture.controller, "SetMaxSqrtSlippage").withArgs(0);
+            await expect(await fixture.controller.maxSqrtSlippage()).to.eq(0);
+            await expect(fixture.controller.connect(governance).setMaxSqrtSlippage(30))
+              .to.emit(fixture.controller, "SetMaxSqrtSlippage").withArgs(30);
+            await expect(await fixture.controller.maxSqrtSlippage()).to.eq(30);
+            await expect(fixture.controller.connect(governance).setMaxSqrtSlippage(100))
+              .to.emit(fixture.controller, "SetMaxSqrtSlippage").withArgs(100);
+            await expect(await fixture.controller.maxSqrtSlippage()).to.eq(100);
+        });
+    })
+
+    describe('#setMaxPriceImpact', () => {
+        it("fail if it's not a action called by governance", async () => {
+            await expect(fixture.controller.connect(depositor).setMaxPriceImpact(30))
+              .to.be.revertedWith("OGC");
+        });
+
+        it("fail if slippage > 10000", async () => {
+            await expect(fixture.controller.connect(governance).setMaxPriceImpact(10001))
+              .to.be.revertedWith("SPI");
+        });
+        it("works if slippage <= 10000", async () => {
+            await expect(fixture.controller.connect(governance).setMaxPriceImpact(0))
+              .to.emit(fixture.controller, "SetMaxPriceImpact").withArgs(0);
+            await expect(await fixture.controller.maxPriceImpact()).to.eq(0);
+            await expect(fixture.controller.connect(governance).setMaxPriceImpact(200))
+              .to.emit(fixture.controller, "SetMaxPriceImpact").withArgs(200);
+            await expect(await fixture.controller.maxPriceImpact()).to.eq(200);
+            await expect(fixture.controller.connect(governance).setMaxPriceImpact(300))
+              .to.emit(fixture.controller, "SetMaxPriceImpact").withArgs(300);
+            await expect(await fixture.controller.maxPriceImpact()).to.eq(300);
         });
     })
 
@@ -297,8 +321,22 @@ describe('HotPotV2FundController', () => {
               FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              0
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.be.reverted;
+        });
+
+        it("fail if the deadline expires", async () => {
+            await expect(fixture.controller.connect(manager).init(
+              hotPotFund.address,
+              token0.address,
+              token1.address,
+              FeeAmount.MEDIUM,
+              getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
+              getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
+              0,
+              Math.floor(new Date().getTime() / 1e3 - 12000)
+            )).to.be.revertedWith("CDL");
         });
 
         it("works if it's a action called by manager", async () => {
@@ -309,7 +347,8 @@ describe('HotPotV2FundController', () => {
               FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              0
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted;
         });
     });
@@ -327,7 +366,8 @@ describe('HotPotV2FundController', () => {
               FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              0)
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000))
 
             //token0 swapPath
             await fixture.controller.connect(manager).setPath(
@@ -342,17 +382,30 @@ describe('HotPotV2FundController', () => {
               token1.address,
               encodePath([investToken.address, token1.address], [FeeAmount.MEDIUM])
             );
+
+            // change init price impact
+            await expect(fixture.controller.connect(governance).setMaxPriceImpact(5000))
+              .to.emit(fixture.controller, "SetMaxPriceImpact").withArgs(5000);
         })
 
         it("fail if it's not a action called by manager", async () => {
             await expect(fixture.controller.connect(depositor).add(
-              hotPotFund.address, 0, 0, INIT_DEPOSIT_AMOUNT, false
+              hotPotFund.address, 0, 0, INIT_DEPOSIT_AMOUNT, false,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.be.reverted;
+        });
+
+        it("fail if the deadline expires", async () => {
+            await expect(fixture.controller.connect(manager).add(
+              hotPotFund.address, 0, 0, INIT_DEPOSIT_AMOUNT, false,
+              Math.floor(new Date().getTime() / 1e3 - 12000)
+            )).to.be.revertedWith("CDL");
         });
 
         it("works if it's a action called by manager", async () => {
             await expect(fixture.controller.connect(manager).add(
-              hotPotFund.address, 0, 0, INIT_DEPOSIT_AMOUNT, false
+              hotPotFund.address, 0, 0, INIT_DEPOSIT_AMOUNT, false,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted;
         });
     });
@@ -370,7 +423,8 @@ describe('HotPotV2FundController', () => {
               FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              0)
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000))
 
             //token0 swapPath
             await fixture.controller.connect(manager).setPath(
@@ -386,21 +440,35 @@ describe('HotPotV2FundController', () => {
               encodePath([investToken.address, token1.address], [FeeAmount.MEDIUM])
             );
 
+            // change init price impact
+            await expect(fixture.controller.connect(governance).setMaxPriceImpact(5000))
+              .to.emit(fixture.controller, "SetMaxPriceImpact").withArgs(5000);
+
             //add position
             await expect(fixture.controller.connect(manager).add(
-              hotPotFund.address, 0, 0, INIT_DEPOSIT_AMOUNT, false
+              hotPotFund.address, 0, 0, INIT_DEPOSIT_AMOUNT, false,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted;
         })
 
         it("fail if it's not a action called by manager", async () => {
             await expect(fixture.controller.connect(depositor).sub(
-              hotPotFund.address, 0, 0, BigNumber.from(100).mul(BigNumber.from(2).pow(128))
+              hotPotFund.address, 0, 0, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.be.reverted;
+        });
+
+        it("fail if the deadline expires", async () => {
+            await expect(fixture.controller.connect(manager).sub(
+              hotPotFund.address, 0, 0, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.floor(new Date().getTime() / 1e3 - 12000)
+            )).to.be.revertedWith("CDL");
         });
 
         it("works if it's a action called by manager", async () => {
             await expect(fixture.controller.connect(manager).sub(
-              hotPotFund.address, 0, 0, BigNumber.from(100).mul(BigNumber.from(2).pow(128))
+              hotPotFund.address, 0, 0, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted;
         });
     });
@@ -418,7 +486,8 @@ describe('HotPotV2FundController', () => {
               FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              0)
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000))
             await fixture.controller.connect(manager).init(
               hotPotFund.address,
               token0.address,
@@ -426,7 +495,8 @@ describe('HotPotV2FundController', () => {
               FeeAmount.MEDIUM,
               getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]) + TICK_SPACINGS[FeeAmount.MEDIUM],
               getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]) - TICK_SPACINGS[FeeAmount.MEDIUM],
-              0)
+              0,
+              Math.round(new Date().getTime() / 1e3 + 12000))
 
             //token0 swapPath
             await fixture.controller.connect(manager).setPath(
@@ -442,24 +512,39 @@ describe('HotPotV2FundController', () => {
               encodePath([investToken.address, token1.address], [FeeAmount.MEDIUM])
             );
 
+            // change init price impact
+            await expect(fixture.controller.connect(governance).setMaxPriceImpact(5000))
+              .to.emit(fixture.controller, "SetMaxPriceImpact").withArgs(5000);
+
             //add 2 position
             await expect(fixture.controller.connect(manager).add(
-              hotPotFund.address, 0, 0, INIT_DEPOSIT_AMOUNT.div(2), false
+              hotPotFund.address, 0, 0, INIT_DEPOSIT_AMOUNT.div(2), false,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted;
             await expect(fixture.controller.connect(manager).add(
-              hotPotFund.address, 0, 0, INIT_DEPOSIT_AMOUNT.div(2), false
+              hotPotFund.address, 0, 0, INIT_DEPOSIT_AMOUNT.div(2), false,
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted;
         })
 
         it("fail if it's not a action called by manager", async () => {
             await expect(fixture.controller.connect(depositor).sub(
-              hotPotFund.address, 0, 0, BigNumber.from(100).mul(BigNumber.from(2).pow(128))
+              hotPotFund.address, 0, 0, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.be.reverted;
+        });
+
+        it("fail if the deadline expires", async () => {
+            await expect(fixture.controller.connect(manager).sub(
+              hotPotFund.address, 0, 0, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.floor(new Date().getTime() / 1e3 - 12000)
+            )).to.be.revertedWith("CDL");
         });
 
         it("works if it's a action called by manager", async () => {
             await expect(fixture.controller.connect(manager).sub(
-              hotPotFund.address, 0, 0, BigNumber.from(100).mul(BigNumber.from(2).pow(128))
+              hotPotFund.address, 0, 0, BigNumber.from(100).mul(BigNumber.from(2).pow(128)),
+              Math.round(new Date().getTime() / 1e3 + 12000)
             )).to.not.be.reverted;
         });
     });
@@ -499,13 +584,15 @@ describe('HotPotV2FundController', () => {
                   [hotPotFund.address, token0.address, token1.address,
                       FeeAmount.MEDIUM,
                       getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-                      getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]), 0]
+                      getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]), 0,
+                      Math.round(new Date().getTime() / 1e3 + 12000)]
                 ),
                 fixture.controller.interface.encodeFunctionData("init",
                   [hotPotFund.address, token0.address, token1.address,
                       FeeAmount.MEDIUM,
                       getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]) + TICK_SPACINGS[FeeAmount.MEDIUM],
-                      getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]) - TICK_SPACINGS[FeeAmount.MEDIUM], 0]
+                      getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]) - TICK_SPACINGS[FeeAmount.MEDIUM], 0,
+                      Math.round(new Date().getTime() / 1e3 + 12000)]
                 ),
             ]
             await expect(fixture.controller.connect(depositor).multicall(data)).to.be.reverted;
@@ -517,13 +604,15 @@ describe('HotPotV2FundController', () => {
                   [hotPotFund.address, token0.address, token1.address,
                       FeeAmount.MEDIUM,
                       getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-                      getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]), 0]
+                      getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]), 0,
+                      Math.round(new Date().getTime() / 1e3 + 12000)]
                 ),
                 fixture.controller.interface.encodeFunctionData("init",
                   [hotPotFund.address, token0.address, token1.address,
                       FeeAmount.MEDIUM,
                       getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]) + TICK_SPACINGS[FeeAmount.MEDIUM],
-                      getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]) - TICK_SPACINGS[FeeAmount.MEDIUM], 0]
+                      getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]) - TICK_SPACINGS[FeeAmount.MEDIUM], 0,
+                      Math.round(new Date().getTime() / 1e3 + 12000)]
                 ),
             ]
             await expect(fixture.controller.connect(manager).multicall(data)).to.not.be.reverted;
@@ -554,11 +643,11 @@ describe('HotPotV2FundController', () => {
               .to.not.be.reverted;
 
             //mock too large slippage harvest
-            await fixture.weth9.connect(depositor).transfer(fixture.testHarvest.address, INIT_FOR_TEST_WETH_AMOUNT);
-            await expect(fixture.testHarvest.harvest(
-                investToken.address, INIT_HARVEST_AMOUNT, INIT_FOR_TEST_WETH_AMOUNT.div(2),
-                encodePath([fixture.weth9.address, fixture.tokenHotPot.address], [FeeAmount.MEDIUM]))
-            ).to.be.revertedWith("MHS");
+            await fixture.weth9.connect(depositor).transfer(fixture.testSlippage.address, INIT_FOR_TEST_WETH_AMOUNT);
+            await expect(fixture.testSlippage.harvest(
+              investToken.address, INIT_HARVEST_AMOUNT, INIT_FOR_TEST_WETH_AMOUNT.div(2),
+              fixture.weth9.address, encodePath([fixture.weth9.address, fixture.tokenHotPot.address], [FeeAmount.MEDIUM]))
+            ).to.be.revertedWith("VS");
         });
 
         it("works if there is a balance and path", async() => {

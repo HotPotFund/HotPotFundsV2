@@ -23,14 +23,17 @@ interface IHotPotV2FundManagerActions {
     /// @param tickLower 价格刻度下届
     /// @param tickUpper 价格刻度上届
     /// @param amount 初始化投入金额，允许为0, 为0表示仅初始化头寸，不作实质性投资
+    /// @param maxPIS 最大价格影响和价格滑点
+    /// @return liquidity 添加的lp数量
     function init(
         address token0,
         address token1,
         uint24 fee,
         int24 tickLower,
         int24 tickUpper,
-        uint amount
-    ) external;
+        uint amount,
+        uint maxPIS
+    ) external returns(uint128 liquidity);
 
     /// @notice 投资指定头寸，可选复投手续费
     /// @dev This function can only be called by controller 
@@ -38,23 +41,29 @@ interface IHotPotV2FundManagerActions {
     /// @param positionIndex 头寸索引号
     /// @param amount 投资金额
     /// @param collect 是否收集已产生的手续费并复投
+    /// @param maxPIS 最大价格影响和价格滑点
+    /// @return liquidity 添加的lp数量
     function add(
         uint poolIndex, 
         uint positionIndex, 
         uint amount, 
-        bool collect
-    ) external;
+        bool collect,
+        uint maxPIS
+    ) external returns(uint128 liquidity);
 
     /// @notice 撤资指定头寸
     /// @dev This function can only be called by controller 
     /// @param poolIndex 池子索引号
     /// @param positionIndex 头寸索引号
     /// @param proportionX128 撤资比例，左移128位; 允许为0，为0表示只收集手续费
+    /// @param maxPIS 最大价格影响和价格滑点
+    /// @return amount 撤资获得的基金本币数量
     function sub(
         uint poolIndex, 
         uint positionIndex, 
-        uint proportionX128
-    ) external;
+        uint proportionX128,
+        uint maxPIS
+    ) external returns(uint amount);
 
     /// @notice 调整头寸投资
     /// @dev This function can only be called by controller 
@@ -62,10 +71,13 @@ interface IHotPotV2FundManagerActions {
     /// @param subIndex 要移除的头寸索引号
     /// @param addIndex 要添加的头寸索引号
     /// @param proportionX128 调整比例，左移128位
+    /// @param maxPIS 最大价格影响和价格滑点
+    /// @return liquidity 调整后添加的lp数量
     function move(
         uint poolIndex,
         uint subIndex, 
         uint addIndex, 
-        uint proportionX128 //以前是按LP数量移除，现在改成按总比例移除，这样前端就不用管实际LP是多少了
-    ) external;
+        uint proportionX128, //以前是按LP数量移除，现在改成按总比例移除，这样前端就不用管实际LP是多少了
+        uint maxPIS
+    ) external  returns(uint128 liquidity);
 }

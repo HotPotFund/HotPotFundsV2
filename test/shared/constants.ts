@@ -14,6 +14,11 @@ export const TICK_SPACINGS: { [amount in FeeAmount]: number } = {
   [FeeAmount.HIGH]: 200,
 }
 
+export const FixedPoint64 = {
+  Q64: BigNumber.from('0x10000000000000000'),
+  RESOLUTION: 64
+}
+
 export const FixedPoint96 = {
   Q96: BigNumber.from('0x1000000000000000000000000'),
   RESOLUTION: 96
