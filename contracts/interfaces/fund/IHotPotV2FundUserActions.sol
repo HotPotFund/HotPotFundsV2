@@ -11,8 +11,8 @@ interface IHotPotV2FundUserActions {
 
     /// @notice 用户取出指定份额的本币
     /// @param share 取出的基金份额数量
-    /// @param amountMIn 最小提取值
+    /// @param amountMin 最小提取值
     /// @param deadline 最晚交易时间
     /// @return amount 返回本币数量
-    function withdraw(uint share, uint amountMIn, uint deadline) external returns(uint amount);
+    function withdraw(uint share, uint amountMin, uint deadline) external returns(uint amount);
 }

@@ -32,7 +32,7 @@ interface IHotPotV2FundManagerActions {
         int24 tickLower,
         int24 tickUpper,
         uint amount,
-        uint maxPIS
+        uint32 maxPIS
     ) external returns(uint128 liquidity);
 
     /// @notice 投资指定头寸，可选复投手续费
@@ -48,7 +48,7 @@ interface IHotPotV2FundManagerActions {
         uint positionIndex, 
         uint amount, 
         bool collect,
-        uint maxPIS
+        uint32 maxPIS
     ) external returns(uint128 liquidity);
 
     /// @notice 撤资指定头寸
@@ -62,7 +62,7 @@ interface IHotPotV2FundManagerActions {
         uint poolIndex, 
         uint positionIndex, 
         uint proportionX128,
-        uint maxPIS
+        uint32 maxPIS
     ) external returns(uint amount);
 
     /// @notice 调整头寸投资
@@ -78,6 +78,6 @@ interface IHotPotV2FundManagerActions {
         uint subIndex, 
         uint addIndex, 
         uint proportionX128, //以前是按LP数量移除，现在改成按总比例移除，这样前端就不用管实际LP是多少了
-        uint maxPIS
+        uint32 maxPIS
     ) external  returns(uint128 liquidity);
 }

@@ -20,13 +20,14 @@ interface IGovernanceActions {
     /// @param path 路径
     function setHarvestPath(address token, bytes memory path) external;
 
-    /// @notice Set the max slippage for swap
+    /// @notice 设置swap时最大滑点，取值范围为 0-1e4, 计算公式为：MaxSwapSlippage = (1 - (sqrtSlippage/1e4)^2) * 100%
+    ///         如设置最大滑点 0.5%, 则 sqrtSlippage 应设置为9974，此时 MaxSwapSlippage = (1-(9974/1e4)^2)*100% = 0.5% 
     /// @dev This function can only be called by governance
     /// @param sqrtSlippage 0-1e4
-    function setMaxSqrtSlippage(uint16 sqrtSlippage) external;
+    function setMaxSqrtSlippage(uint32 sqrtSlippage) external;
 
     /// @notice Set the max price impact for swap
     /// @dev This function can only be called by governance
     /// @param priceImpact 0-1e4
-    function setMaxPriceImpact(uint16 priceImpact) external;
+    function setMaxPriceImpact(uint32 priceImpact) external;
 }

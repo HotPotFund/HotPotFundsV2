@@ -258,7 +258,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
         int24 tickLower,
         int24 tickUpper,
         uint amount,
-        uint maxPIS
+        uint32 maxPIS
     ) external override onlyController returns(uint128 liquidity){
         // 1、检查pool是否有效
         require(tickLower < tickUpper, "ITV");
@@ -313,8 +313,8 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
                 token: fToken,
                 uniV3Router: uniV3Router,
                 uniV3Factory: uniV3Factory,
-                maxSqrtSlippage: uint16(maxPIS & 0xffff),
-                maxPriceImpact: uint16(maxPIS >> 16)
+                maxSqrtSlippage: maxPIS & 0xffff,
+                maxPriceImpact: maxPIS >> 16
             }), sellPath, buyPath);
         }
     }
@@ -325,7 +325,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
         uint positionIndex,
         uint amount,
         bool collect,
-        uint maxPIS
+        uint32 maxPIS
     ) external override onlyController returns(uint128 liquidity){
         require(IERC20(token).balanceOf(address(this)) >= amount, "ATL");
         require(poolIndex < pools.length, "IPL");
@@ -347,8 +347,8 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
             token: token,
             uniV3Router: uniV3Router,
             uniV3Factory: uniV3Factory,
-            maxSqrtSlippage: uint16(maxPIS & 0xffff),
-            maxPriceImpact: uint16(maxPIS >> 16)
+            maxSqrtSlippage: maxPIS & 0xffff,
+            maxPriceImpact: maxPIS >> 16
         }), sellPath, buyPath);
     }
 
@@ -357,7 +357,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
         uint poolIndex,
         uint positionIndex,
         uint proportionX128,
-        uint maxPIS
+        uint32 maxPIS
     ) external override onlyController returns(uint amount){
         require(poolIndex < pools.length, "IPL");
         require(positionIndex < positions[poolIndex].length, "IPS");
@@ -368,8 +368,8 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
             token: token,
             uniV3Router: uniV3Router,
             uniV3Factory: uniV3Factory,
-            maxSqrtSlippage: uint16(maxPIS & 0xffff),
-            maxPriceImpact: uint16(maxPIS >> 16)
+            maxSqrtSlippage: maxPIS & 0xffff,
+            maxPriceImpact: maxPIS >> 16
         }), sellPath);
     }
 
@@ -379,7 +379,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
         uint subIndex,
         uint addIndex,
         uint proportionX128,
-        uint maxPIS
+        uint32 maxPIS
     ) external override onlyController returns(uint128 liquidity){
         require(poolIndex < pools.length, "IPL");
         require(subIndex < positions[poolIndex].length, "ISI");
@@ -399,8 +399,8 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
             token: token,
             uniV3Router: uniV3Router,
             uniV3Factory: uniV3Factory,
-            maxSqrtSlippage: uint16(maxPIS & 0xffff),
-            maxPriceImpact: uint16(maxPIS >> 16)
+            maxSqrtSlippage: maxPIS & 0xffff,
+            maxPriceImpact: maxPIS >> 16
         }), sellPath, buyPath);
     }
 

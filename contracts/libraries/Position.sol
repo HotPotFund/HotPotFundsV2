@@ -56,17 +56,17 @@ library Position {
     }
 
     /// @notice 计算最小兑换输出值
-    /// @param curPirce 当前价
-    /// @param maxPriceImpact 最大价格影响, 大于1e4就不用验证了
+    /// @param curSqrtPirceX96 当前价
+    /// @param maxPriceImpact 最大价格影响
     /// @param amountIn 输入数里
     function getAmountOutMin(
-        uint160 curPirce, 
-        uint16 maxPriceImpact, 
+        uint curSqrtPirceX96, 
+        uint maxPriceImpact, 
         uint amountIn
     ) internal pure returns(uint amountOutMin){
         amountOutMin = FullMath.mulDiv(
-            FullMath.mulDiv(amountIn, FullMath.mulDiv(curPirce, curPirce, FixedPoint64.Q64), FixedPoint128.Q128), 
-            1e4 - maxPriceImpact, 
+            FullMath.mulDiv(amountIn, FullMath.mulDiv(curSqrtPirceX96, curSqrtPirceX96, FixedPoint64.Q64), FixedPoint128.Q128), 
+            1e4 - maxPriceImpact, // maxPriceImpact最大1e4，不会溢出
             1e4);
     }
 
@@ -83,8 +83,8 @@ library Position {
         uint24 fee;
         address uniV3Factory;
         address uniV3Router;
-        uint16 maxSqrtSlippage;
-        uint16 maxPriceImpact;
+        uint32 maxSqrtSlippage;
+        uint32 maxPriceImpact;
     }
 
     /// @notice 根据基金本币数量以及收集的手续费数量, 计算投资指定头寸两种代币的分布.
@@ -95,8 +95,8 @@ library Position {
         uint equalAmount0;
         bytes memory buy0Path;
         bytes memory buy1Path;
-        uint160 buy0SqrtPriceX96;
-        uint160 buy1SqrtPriceX96;
+        uint buy0SqrtPriceX96;
+        uint buy1SqrtPriceX96;
         uint amountIn;
 
         //将基金本币换算成token0
@@ -201,7 +201,7 @@ library Position {
                 if(params.amount1 > amount1Max) {
                     amountIn = params.amount1.sub(amount1Max);
                     buy0Path = abi.encodePacked(params.token1, params.fee, params.token0);
-                    buy0SqrtPriceX96 = uint160(FixedPoint96.Q96 * FixedPoint96.Q96 / params.sqrtPriceX96);// 不会出现溢出
+                    buy0SqrtPriceX96 = FixedPoint96.Q96 * FixedPoint96.Q96 / params.sqrtPriceX96;// 不会出现溢出
                     (uint lastSqrtPriceX96,) = PathPrice.getSqrtPriceX96(buy0Path, params.uniV3Factory, 0x1);
                     if(lastSqrtPriceX96 > buy0SqrtPriceX96) 
                         require(buy0SqrtPriceX96 > params.maxSqrtSlippage * lastSqrtPriceX96 / 1e4, "VS");// 不会出现溢出
@@ -267,8 +267,8 @@ library Position {
         //UNISWAP_V3_ROUTER
         address uniV3Router;
         address uniV3Factory;
-        uint16 maxSqrtSlippage;
-        uint16 maxPriceImpact;
+        uint32 maxSqrtSlippage;
+        uint32 maxPriceImpact;
     }
 
     /// @notice 添加LP到指定Position
@@ -390,8 +390,8 @@ library Position {
         //UNISWAP_V3_ROUTER
         address uniV3Router;
         address uniV3Factory;
-        uint16 maxSqrtSlippage;
-        uint16 maxPriceImpact;
+        uint32 maxSqrtSlippage;
+        uint32 maxPriceImpact;
     }
 
     /// @notice 减少指定头寸LP，并取回本金本币
@@ -405,8 +405,8 @@ library Position {
     ) public returns(uint amount) {
         address token0 = IUniswapV3Pool(params.pool).token0();
         address token1 = IUniswapV3Pool(params.pool).token1();
-        uint160 sqrtPriceX96;
-        uint160 sqrtPriceX96Last;
+        uint sqrtPriceX96;
+        uint sqrtPriceX96Last;
         uint amountOutMin;
 
         // 验证本池子的滑点
@@ -422,8 +422,8 @@ library Position {
                 require(sqrtPriceX96 > params.maxSqrtSlippage * sqrtPriceX96Last / 1e4, "VS");// 不会出现溢出
             
             // t1到t0的滑点
-            sqrtPriceX96 = uint160(FixedPoint96.Q96 * FixedPoint96.Q96 / sqrtPriceX96); // 不会出现溢出
-            sqrtPriceX96Last = uint160(FixedPoint96.Q96 * FixedPoint96.Q96 / sqrtPriceX96Last); 
+            sqrtPriceX96 = FixedPoint96.Q96 * FixedPoint96.Q96 / sqrtPriceX96; // 不会出现溢出
+            sqrtPriceX96Last = FixedPoint96.Q96 * FixedPoint96.Q96 / sqrtPriceX96Last; 
             if(sqrtPriceX96Last > sqrtPriceX96)
                 require(sqrtPriceX96 > params.maxSqrtSlippage * sqrtPriceX96Last / 1e4, "VS"); // 不会出现溢出
         }
@@ -472,8 +472,8 @@ library Position {
     struct AssetsParams {
         address token0;
         address token1;
-        uint160 price0;
-        uint160 price1;
+        uint sqrt0;
+        uint sqrt1;
         uint160 sqrtPriceX96;
         int24 tick;
         uint256 feeGrowthGlobal0X128;
@@ -499,12 +499,12 @@ library Position {
         if(params.token0 != token){
             bytes memory path = sellPath[params.token0];
             if(path.length == 0) return(amount, amounts);
-            (params.price0,) = PathPrice.getSqrtPriceX96(path, uniV3Factory, 0x1);
+            (params.sqrt0,) = PathPrice.getSqrtPriceX96(path, uniV3Factory, 0x1);
         }
         if(params.token1 != token){
             bytes memory path = sellPath[params.token1];
             if(path.length == 0) return(amount, amounts);
-            (params.price1,) = PathPrice.getSqrtPriceX96(path, uniV3Factory, 0x1);
+            (params.sqrt1,) = PathPrice.getSqrtPriceX96(path, uniV3Factory, 0x1);
         }
 
         (params.sqrtPriceX96, params.tick, , , , , ) = IUniswapV3Pool(pool).slot0();
@@ -535,7 +535,7 @@ library Position {
             if(params.token0 != token){
                 _amount = FullMath.mulDiv(
                     _amount0,
-                    FullMath.mulDiv(params.price0, params.price0, FixedPoint64.Q64),
+                    FullMath.mulDiv(params.sqrt0, params.sqrt0, FixedPoint64.Q64),
                     FixedPoint128.Q128);
             }
             else
@@ -544,7 +544,7 @@ library Position {
             if(params.token1 != token){
                 _amount = _amount.add(FullMath.mulDiv(
                     _amount1,
-                    FullMath.mulDiv(params.price1, params.price1, FixedPoint64.Q64),
+                    FullMath.mulDiv(params.sqrt1, params.sqrt1, FixedPoint64.Q64),
                     FixedPoint128.Q128));
             }
             else
@@ -593,10 +593,10 @@ library Position {
         if(amount0 > 0){
             address token0 = IUniswapV3Pool(pool).token0();
             if(token0 != token){
-                (uint160 price0,) = PathPrice.getSqrtPriceX96(sellPath[token0], uniV3Factory, 0x1);
+                (uint sqrt0,) = PathPrice.getSqrtPriceX96(sellPath[token0], uniV3Factory, 0x1);
                 amount = FullMath.mulDiv(
                     amount0,
-                    FullMath.mulDiv(price0, price0, FixedPoint64.Q64),
+                    FullMath.mulDiv(sqrt0, sqrt0, FixedPoint64.Q64),
                     FixedPoint128.Q128);
             } else
                 amount = amount0;
@@ -604,10 +604,10 @@ library Position {
         if(amount1 > 0){
             address token1 = IUniswapV3Pool(pool).token1();
             if(token1 != token){
-                (uint160 price1,) = PathPrice.getSqrtPriceX96(sellPath[token1], uniV3Factory, 0x1);
+                (uint sqrt1,) = PathPrice.getSqrtPriceX96(sellPath[token1], uniV3Factory, 0x1);
                 amount = amount.add(FullMath.mulDiv(
                     amount1,
-                    FullMath.mulDiv(price1, price1, FixedPoint64.Q64),
+                    FullMath.mulDiv(sqrt1, sqrt1, FixedPoint64.Q64),
                     FixedPoint128.Q128));
             } else
                 amount = amount.add(amount1);

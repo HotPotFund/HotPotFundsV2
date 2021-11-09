@@ -19,7 +19,7 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
     address public override immutable hotpot;
     address public override governance;
     address public override immutable WETH9;
-    uint32 maxPIS = (100 << 16) + 9974;// MaxPriceImpact: 1%, MaxSwapSlippage: 0.5% = (1 - 0.9974 * 0.9974) * 100%
+    uint32 maxPIS = (100 << 16) + 9974;// MaxPriceImpact: 1%, MaxSwapSlippage: 0.5% = (1 - (sqrtSlippage/1e4)^2) * 100%
 
     mapping (address => bool) public override verifiedToken;
     mapping (address => bytes) public override harvestPath;
@@ -54,13 +54,13 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
     }
 
     /// @inheritdoc IControllerState
-    function maxPriceImpact() external override view returns(uint16 priceImpact){
-        return uint16(maxPIS >> 16);
+    function maxPriceImpact() external override view returns(uint32 priceImpact){
+        return maxPIS >> 16;
     }
 
     /// @inheritdoc IControllerState
-    function maxSqrtSlippage() external override view returns(uint16 sqrtSlippage){
-        return uint16(maxPIS & 0xffff);
+    function maxSqrtSlippage() external override view returns(uint32 sqrtSlippage){
+        return maxPIS & 0xffff;
     }
 
     /// @inheritdoc IGovernanceActions
@@ -89,14 +89,14 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
     }
 
     /// @inheritdoc IGovernanceActions
-    function setMaxPriceImpact(uint16 priceImpact) external override onlyGovernance {
+    function setMaxPriceImpact(uint32 priceImpact) external override onlyGovernance {
         require(priceImpact <= 1e4 ,"SPI");
-        maxPIS = (uint32(priceImpact) << 16) | (maxPIS & 0xffff);
+        maxPIS = (priceImpact << 16) | (maxPIS & 0xffff);
         emit SetMaxPriceImpact(priceImpact);
     }
 
     /// @inheritdoc IGovernanceActions
-    function setMaxSqrtSlippage(uint16 sqrtSlippage) external override onlyGovernance {
+    function setMaxSqrtSlippage(uint32 sqrtSlippage) external override onlyGovernance {
         require(sqrtSlippage <= 1e4 ,"SSS");
         maxPIS = maxPIS & 0xffff0000 | sqrtSlippage;
         emit SetMaxSqrtSlippage(sqrtSlippage);
@@ -105,7 +105,7 @@ contract HotPotV2FundController is IHotPotV2FundController, Multicall {
     /// @inheritdoc IHotPotV2FundController
     function harvest(address token, uint amount) external override returns(uint burned) {
         bytes memory path = harvestPath[token];
-        PathPrice.verifySlippage(path, uniV3Factory, uint16(maxPIS & 0xffff));
+        PathPrice.verifySlippage(path, uniV3Factory, maxPIS & 0xffff);
         uint value = amount <= IERC20(token).balanceOf(address(this)) ? amount : IERC20(token).balanceOf(address(this));
         TransferHelper.safeApprove(token, uniV3Router, value);
 
