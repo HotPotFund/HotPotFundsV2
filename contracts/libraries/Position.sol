@@ -202,7 +202,7 @@ library Position {
                     amountIn = params.amount1.sub(amount1Max);
                     buy0Path = abi.encodePacked(params.token1, params.fee, params.token0);
                     buy0SqrtPriceX96 = FixedPoint96.Q96 * FixedPoint96.Q96 / params.sqrtPriceX96;// 不会出现溢出
-                    (uint lastSqrtPriceX96,) = PathPrice.getSqrtPriceX96(buy0Path, params.uniV3Factory, 0x1);
+                    uint lastSqrtPriceX96 = PathPrice.getSqrtPriceX96Last(buy0Path, params.uniV3Factory);
                     if(lastSqrtPriceX96 > buy0SqrtPriceX96) 
                         require(buy0SqrtPriceX96 > params.maxSqrtSlippage * lastSqrtPriceX96 / 1e4, "VS");// 不会出现溢出
                     uint amountOutMin = getAmountOutMin(buy0SqrtPriceX96, params.maxPriceImpact, amountIn);
@@ -239,7 +239,7 @@ library Position {
                 amountIn = params.amount0.sub(amount0Max);
                 buy1Path = abi.encodePacked(params.token0, params.fee, params.token1);
                 buy1SqrtPriceX96 = params.sqrtPriceX96;
-                (uint lastSqrtPriceX96,) = PathPrice.getSqrtPriceX96(buy1Path, params.uniV3Factory, 0x1);
+                uint lastSqrtPriceX96 = PathPrice.getSqrtPriceX96Last(buy1Path, params.uniV3Factory);
                 if(lastSqrtPriceX96 > buy1SqrtPriceX96) 
                     require(buy1SqrtPriceX96 > params.maxSqrtSlippage * lastSqrtPriceX96 / 1e4, "VS");// 不会出现溢出
                 uint amountOutMin = getAmountOutMin(buy1SqrtPriceX96, params.maxPriceImpact, amountIn);
@@ -499,12 +499,12 @@ library Position {
         if(params.token0 != token){
             bytes memory path = sellPath[params.token0];
             if(path.length == 0) return(amount, amounts);
-            (params.sqrt0,) = PathPrice.getSqrtPriceX96(path, uniV3Factory, 0x1);
+            params.sqrt0 = PathPrice.getSqrtPriceX96Last(path, uniV3Factory);
         }
         if(params.token1 != token){
             bytes memory path = sellPath[params.token1];
             if(path.length == 0) return(amount, amounts);
-            (params.sqrt1,) = PathPrice.getSqrtPriceX96(path, uniV3Factory, 0x1);
+            params.sqrt1 = PathPrice.getSqrtPriceX96Last(path, uniV3Factory);
         }
 
         (params.sqrtPriceX96, params.tick, , , , , ) = IUniswapV3Pool(pool).slot0();
@@ -593,7 +593,7 @@ library Position {
         if(amount0 > 0){
             address token0 = IUniswapV3Pool(pool).token0();
             if(token0 != token){
-                (uint sqrt0,) = PathPrice.getSqrtPriceX96(sellPath[token0], uniV3Factory, 0x1);
+                uint sqrt0 = PathPrice.getSqrtPriceX96Last(sellPath[token0], uniV3Factory);
                 amount = FullMath.mulDiv(
                     amount0,
                     FullMath.mulDiv(sqrt0, sqrt0, FixedPoint64.Q64),
@@ -604,7 +604,7 @@ library Position {
         if(amount1 > 0){
             address token1 = IUniswapV3Pool(pool).token1();
             if(token1 != token){
-                (uint sqrt1,) = PathPrice.getSqrtPriceX96(sellPath[token1], uniV3Factory, 0x1);
+                uint sqrt1 = PathPrice.getSqrtPriceX96Last(sellPath[token1], uniV3Factory);
                 amount = amount.add(FullMath.mulDiv(
                     amount1,
                     FullMath.mulDiv(sqrt1, sqrt1, FixedPoint64.Q64),

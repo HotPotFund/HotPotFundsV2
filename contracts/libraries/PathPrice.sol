@@ -14,20 +14,51 @@ import "@uniswap/v3-periphery/contracts/libraries/Path.sol";
 library PathPrice {
     using Path for bytes;
 
-    /// @notice 根据设定的兑换路径，获取目标代币的价格平方根
+    /// @notice 根据设定的兑换路径，获取目标代币当前价格的平方根
     /// @param path 兑换路径
-    /// @param priceType priceType & 0x1 > 0 获取预言机价格, priceType & 0x2 >0 获取当前价格，同时满足（如0x3）获取2种价格
-    /// @return sqrtPriceX96Last sqrtPriceX96 价格的平方根(X 2^96)，给定兑换路径的 tokenOut / tokenIn 的价格
+    /// @return sqrtPriceX96 价格的平方根(X 2^96)，给定兑换路径的 tokenOut / tokenIn 的价格
     // Supports priceX96 between TickMath.MIN_SQRT_RATIO and TickMath.MAX_SQRT_RATIO
     function getSqrtPriceX96(
         bytes memory path, 
-        address uniV3Factory,
-        uint8 priceType
-    ) internal view returns (uint sqrtPriceX96Last, uint sqrtPriceX96){
+        address uniV3Factory
+    ) internal view returns (uint sqrtPriceX96){
         require(path.length > 0, "IPL");
 
-        uint _sqrtPriceX96Last = FixedPoint96.Q96;
-        uint _sqrtPriceX96 = FixedPoint96.Q96;
+        sqrtPriceX96 = FixedPoint96.Q96;
+        uint _nextSqrtPriceX96;
+        uint32[] memory secondAges = new uint32[](2);
+        secondAges[0] = 0;
+        secondAges[1] = 1;
+        while (true) {
+            (address tokenIn, address tokenOut, uint24 fee) = path.decodeFirstPool();
+            IUniswapV3Pool pool = IUniswapV3Pool(PoolAddress.computeAddress(uniV3Factory, PoolAddress.getPoolKey(tokenIn, tokenOut, fee)));
+
+            (_nextSqrtPriceX96,,,,,,) = pool.slot0();
+            sqrtPriceX96 = tokenIn > tokenOut
+                ? FullMath.mulDiv(sqrtPriceX96, FixedPoint96.Q96, _nextSqrtPriceX96)
+                : FullMath.mulDiv(sqrtPriceX96, _nextSqrtPriceX96, FixedPoint96.Q96);
+            require(sqrtPriceX96 >= TickMath.MIN_SQRT_RATIO, "R");
+            require(sqrtPriceX96 < TickMath.MAX_SQRT_RATIO, "R");
+
+            // decide whether to continue or terminate
+            if (path.hasMultiplePools())
+                path = path.skipToken();
+            else 
+                break; 
+        }
+    }
+
+    /// @notice 根据设定的兑换路径，获取目标代币历史价格的平方根
+    /// @param path 兑换路径
+    /// @return sqrtPriceX96Last 价格的平方根(X 2^96)，给定兑换路径的 tokenOut / tokenIn 的价格
+    // Supports priceX96 between TickMath.MIN_SQRT_RATIO and TickMath.MAX_SQRT_RATIO
+    function getSqrtPriceX96Last(
+        bytes memory path, 
+        address uniV3Factory
+    ) internal view returns (uint sqrtPriceX96Last){
+        require(path.length > 0, "IPL");
+
+        sqrtPriceX96Last = FixedPoint96.Q96;
         uint _nextSqrtPriceX96;
         uint32[] memory secondAges = new uint32[](2);
         secondAges[0] = 0;
@@ -37,31 +68,19 @@ library PathPrice {
             IUniswapV3Pool pool = IUniswapV3Pool(PoolAddress.computeAddress(uniV3Factory, PoolAddress.getPoolKey(tokenIn, tokenOut, fee)));
 
             // sqrtPriceX96Last
-            if(priceType & 0x1 > 0) {
-                (int56[] memory tickCumulatives,) = pool.observe(secondAges);
-                _nextSqrtPriceX96 = TickMath.getSqrtRatioAtTick(int24(tickCumulatives[0] - tickCumulatives[1]));
-                _sqrtPriceX96Last = tokenIn > tokenOut
-                    ? FullMath.mulDiv(_sqrtPriceX96Last, FixedPoint96.Q96, _nextSqrtPriceX96)
-                    : FullMath.mulDiv(_sqrtPriceX96Last, _nextSqrtPriceX96, FixedPoint96.Q96);
-                require(_sqrtPriceX96Last >= TickMath.MIN_SQRT_RATIO, "R");
-                require(_sqrtPriceX96Last < TickMath.MAX_SQRT_RATIO, "R");
-            }
-
-            // sqrtPriceX96
-            if(priceType & 0x2 > 0) {
-                (_nextSqrtPriceX96,,,,,,) = pool.slot0();
-                _sqrtPriceX96 = tokenIn > tokenOut
-                    ? FullMath.mulDiv(_sqrtPriceX96, FixedPoint96.Q96, _nextSqrtPriceX96)
-                    : FullMath.mulDiv(_sqrtPriceX96, _nextSqrtPriceX96, FixedPoint96.Q96);
-                require(_sqrtPriceX96 >= TickMath.MIN_SQRT_RATIO, "R");
-                require(_sqrtPriceX96 < TickMath.MAX_SQRT_RATIO, "R");
-            }
+            (int56[] memory tickCumulatives,) = pool.observe(secondAges);
+            _nextSqrtPriceX96 = TickMath.getSqrtRatioAtTick(int24(tickCumulatives[0] - tickCumulatives[1]));
+            sqrtPriceX96Last = tokenIn > tokenOut
+                ? FullMath.mulDiv(sqrtPriceX96Last, FixedPoint96.Q96, _nextSqrtPriceX96)
+                : FullMath.mulDiv(sqrtPriceX96Last, _nextSqrtPriceX96, FixedPoint96.Q96);
+            require(sqrtPriceX96Last >= TickMath.MIN_SQRT_RATIO, "R");
+            require(sqrtPriceX96Last < TickMath.MAX_SQRT_RATIO, "R");
 
             // decide whether to continue or terminate
             if (path.hasMultiplePools())
                 path = path.skipToken();
             else 
-                return (_sqrtPriceX96Last, _sqrtPriceX96);
+                break;
         }
     }
 
@@ -75,7 +94,8 @@ library PathPrice {
         address uniV3Factory, 
         uint32 maxSqrtSlippage
     ) internal view returns(uint) { 
-        (uint last, uint current) = getSqrtPriceX96(path, uniV3Factory, 0x3);
+        uint last = getSqrtPriceX96Last(path, uniV3Factory);
+        uint current = getSqrtPriceX96(path, uniV3Factory);
         if(last > current) require(current > maxSqrtSlippage * last / 1e4, "VS");//16bit * 160bit / 16bit 不会溢出
         return current;
     }
