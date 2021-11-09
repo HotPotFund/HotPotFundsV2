@@ -14,10 +14,9 @@ import "@uniswap/v3-periphery/contracts/libraries/Path.sol";
 library PathPrice {
     using Path for bytes;
 
-    /// @notice 根据设定的兑换路径，获取目标代币当前价格的平方根
+    /// @notice 获取目标代币当前价格的平方根
     /// @param path 兑换路径
     /// @return sqrtPriceX96 价格的平方根(X 2^96)，给定兑换路径的 tokenOut / tokenIn 的价格
-    // Supports priceX96 between TickMath.MIN_SQRT_RATIO and TickMath.MAX_SQRT_RATIO
     function getSqrtPriceX96(
         bytes memory path, 
         address uniV3Factory
@@ -37,8 +36,6 @@ library PathPrice {
             sqrtPriceX96 = tokenIn > tokenOut
                 ? FullMath.mulDiv(sqrtPriceX96, FixedPoint96.Q96, _nextSqrtPriceX96)
                 : FullMath.mulDiv(sqrtPriceX96, _nextSqrtPriceX96, FixedPoint96.Q96);
-            require(sqrtPriceX96 >= TickMath.MIN_SQRT_RATIO, "R");
-            require(sqrtPriceX96 < TickMath.MAX_SQRT_RATIO, "R");
 
             // decide whether to continue or terminate
             if (path.hasMultiplePools())
@@ -48,10 +45,9 @@ library PathPrice {
         }
     }
 
-    /// @notice 根据设定的兑换路径，获取目标代币历史价格的平方根
+    /// @notice 获取目标代币预言机价格的平方根
     /// @param path 兑换路径
-    /// @return sqrtPriceX96Last 价格的平方根(X 2^96)，给定兑换路径的 tokenOut / tokenIn 的价格
-    // Supports priceX96 between TickMath.MIN_SQRT_RATIO and TickMath.MAX_SQRT_RATIO
+    /// @return sqrtPriceX96Last 预言机价格的平方根(X 2^96)，给定兑换路径的 tokenOut / tokenIn 的价格
     function getSqrtPriceX96Last(
         bytes memory path, 
         address uniV3Factory
@@ -73,8 +69,6 @@ library PathPrice {
             sqrtPriceX96Last = tokenIn > tokenOut
                 ? FullMath.mulDiv(sqrtPriceX96Last, FixedPoint96.Q96, _nextSqrtPriceX96)
                 : FullMath.mulDiv(sqrtPriceX96Last, _nextSqrtPriceX96, FixedPoint96.Q96);
-            require(sqrtPriceX96Last >= TickMath.MIN_SQRT_RATIO, "R");
-            require(sqrtPriceX96Last < TickMath.MAX_SQRT_RATIO, "R");
 
             // decide whether to continue or terminate
             if (path.hasMultiplePools())
