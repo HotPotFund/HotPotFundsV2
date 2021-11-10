@@ -90,7 +90,7 @@ library PathPrice {
     ) internal view returns(uint) { 
         uint last = getSqrtPriceX96Last(path, uniV3Factory);
         uint current = getSqrtPriceX96(path, uniV3Factory);
-        if(last > current) require(current > maxSqrtSlippage * last / 1e4, "VS");//16bit * 160bit / 16bit 不会溢出
+        if(last > current) require(current > FullMath.mulDiv(maxSqrtSlippage, last, 1e4), "VS");
         return current;
     }
 }
