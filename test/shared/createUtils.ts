@@ -1,4 +1,4 @@
-import { constants, Contract, utils, Wallet } from 'ethers'
+import { BigNumber, constants, Contract, utils, Wallet } from 'ethers'
 
 import { getMaxTick, getMinTick } from './ticks'
 import { FeeAmount, TICK_SPACINGS } from './constants'
@@ -50,8 +50,11 @@ export async function createUniV3PoolAndInit(miner: Wallet,
 export async function createFund(manager: Wallet,
                                  token: Contract,
                                  depositor: string,
+                                 lockPeriod: number,
+                                 baseLine: number,
+                                 managerFee: number,
                                  hotPotFactory: IHotPotV2FundFactory) {
-  await hotPotFactory.connect(manager).createFund(token.address, utils.formatBytes32String(depositor));
+  await hotPotFactory.connect(manager).createFund(token.address, utils.formatBytes32String(depositor), lockPeriod, baseLine, managerFee);
   const fundAddress = await hotPotFactory.getFund(manager.address, token.address);
   return new Contract(fundAddress, HotPotV2FundAbi.abi, hotPotFactory.provider) as IHotPotV2Fund;
 }

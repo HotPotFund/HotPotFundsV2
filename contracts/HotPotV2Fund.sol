@@ -31,9 +31,10 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
     using Position for Position.Info[];
     using Array2D for uint[][];
 
-    uint constant DIVISOR = 100 << 128;
-    uint constant MANAGER_FEE = 10 << 128;
-    uint constant FEE = 10 << 128;
+    uint public override immutable lockPeriod;
+    uint public override immutable baseLine;
+    uint public override immutable managerFee;
+    uint constant FEE = 5;
 
     address immutable WETH9;
     address immutable uniV3Factory;
@@ -42,7 +43,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
     address public override immutable controller;
     address public override immutable manager;
     address public override immutable token;
-    bytes32 public override descriptor;
+    bytes public override descriptor;
 
     uint public override totalInvestment;
 
@@ -53,6 +54,8 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
     mapping(address => bytes) public override buyPath;
     /// @inheritdoc IHotPotV2FundState
     mapping(address => bytes) public override sellPath;
+    /// @inheritdoc IHotPotV2FundState
+    mapping(address => uint) public override lastDepositTime;
 
     /// @inheritdoc IHotPotV2FundState
     address[] public override pools;
@@ -72,7 +75,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
     constructor () {
         address _token;
         address _uniV3Router;
-        (WETH9, uniV3Factory, _uniV3Router, controller, manager, _token, descriptor) = IHotPotV2FundDeployer(msg.sender).parameters();
+        (WETH9, uniV3Factory, _uniV3Router, controller, manager, _token, descriptor, lockPeriod, baseLine, managerFee) = IHotPotV2FundDeployer(msg.sender).parameters();
         token = _token;
         uniV3Router = _uniV3Router;
 
@@ -95,6 +98,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
         else
             share =  FullMath.mulDiv(amount, totalSupply, total_assets);
 
+        lastDepositTime[msg.sender] = block.timestamp;
         investmentOf[msg.sender] = investmentOf[msg.sender].add(amount);
         totalInvestment = totalInvestment.add(amount);
         _mint(msg.sender, share);
@@ -119,6 +123,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
     function withdraw(uint share, uint amountMin, uint deadline) external override checkDeadline(deadline) nonReentrant returns(uint amount) {
         uint balance = balanceOf[msg.sender];
         require(share > 0 && share <= balance, "ISA");
+        require(block.timestamp > lastDepositTime[msg.sender].add(lockPeriod), "LKP");
         uint investment = FullMath.mulDiv(investmentOf[msg.sender], share, balance);
 
         address fToken = token;
@@ -143,7 +148,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
 
                 if(remainingAmount <= desirableAmount){
                     positions[poolIndex][positionIndex].subLiquidity(Position.SubParams({
-                        proportionX128: FullMath.mulDiv(remainingAmount, DIVISOR, desirableAmount),
+                        proportionX128: FullMath.mulDiv(remainingAmount, 100 << 128, desirableAmount),
                         pool: pools[poolIndex],
                         token: fToken,
                         uniV3Router: uniV3Router,
@@ -155,7 +160,7 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
                 }
                 else {
                     positions[poolIndex][positionIndex].subLiquidity(Position.SubParams({
-                            proportionX128: DIVISOR,
+                            proportionX128: 100 << 128,
                             pool: pools[poolIndex],
                             token: fToken,
                             uniV3Router: uniV3Router,
@@ -178,15 +183,16 @@ contract HotPotV2Fund is HotPotV2FundERC20, IHotPotV2Fund, IUniswapV3MintCallbac
         }
         require(amount >= amountMin, 'PSC');
 
+        uint baseAmount = investment.add(investment.mul(baseLine) / 100);
         // 处理基金经理分成和基金分成
-        if(amount > investment){
-            uint _manager_fee = FullMath.mulDiv(amount.sub(investment), MANAGER_FEE, DIVISOR);
-            uint _fee = FullMath.mulDiv(amount.sub(investment), FEE, DIVISOR);
+        if(amount > baseAmount) {
+            uint _manager_fee = (amount.sub(baseAmount)).mul(managerFee) / 100;
+            uint _fee = (amount.sub(baseAmount)).mul(FEE) / 100;
             TransferHelper.safeTransfer(fToken, manager, _manager_fee);
             TransferHelper.safeTransfer(fToken, controller, _fee);
             amount = amount.sub(_fee).sub(_manager_fee);
         }
-        else
+        else if(amount < investment)// 保留亏损的本金
             investment = amount;
 
         // 处理转账

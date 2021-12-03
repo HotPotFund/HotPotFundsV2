@@ -34,9 +34,11 @@ interface IHotPotV2FundFactory {
     function getFund(address manager, address token) external view returns (address fund);
 
     /// @notice Creates a fund for the given manager and token
-    // / @param manager 基金的manager
     /// @param token 管理的token
     /// @param descriptor 基金名称+描述
+    /// @param lockPeriod 基金锁定期
+    /// @param baseLine 基金经理收费基准线，高于这个比例的收益，用户在提取时才会被收取费用
+    /// @param managerFee 当收益大于基准线时，基金经理的收费比例
     /// @return fund 基金地址
-    function createFund(address token, bytes32 descriptor) external returns (address fund);
+    function createFund(address token, bytes calldata descriptor, uint lockPeriod, uint baseLine, uint managerFee) external returns (address fund);
 }

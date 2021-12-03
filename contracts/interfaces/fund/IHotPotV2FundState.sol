@@ -12,8 +12,22 @@ interface IHotPotV2FundState {
     /// @notice 基金本币地址
     function token() external view returns (address);
 
-    /// @notice 8 bytes 基金经理 + 24 bytes 简要描述
-    function descriptor() external view returns (bytes32);
+    /// @notice 32 bytes 基金经理 + 任意长度的简要描述
+    function descriptor() external view returns (bytes memory);
+
+    /// @notice 基金锁定期
+    function lockPeriod() external view returns (uint);
+
+    /// @notice 基金经理收费基线
+    function baseLine() external view returns (uint);
+
+    /// @notice 基金经理收费比例
+    function managerFee() external view returns (uint);
+
+    /// @notice 获取最新存入时间
+    /// @param account 目标地址
+    /// @return 最新存入时间
+    function lastDepositTime(address account) external view returns (uint);
 
     /// @notice 总投入数量
     function totalInvestment() external view returns (uint);

@@ -1,4 +1,4 @@
-import { constants } from 'ethers'
+import { BigNumber, constants } from 'ethers'
 import { ethers, waffle } from 'hardhat'
 
 import { Fixture } from 'ethereum-waffle'
@@ -14,7 +14,6 @@ describe('HotPotV2FundFactory', () => {
 
   let fixture: CompleteFixture;
   let loadFixture: ReturnType<typeof waffle.createFixtureLoader>
-
 
   const factoryFixture: Fixture<CompleteFixture> = async (wallets, provider) => {
     const fixture = await completeFixture(wallets, provider)
@@ -47,14 +46,18 @@ describe('HotPotV2FundFactory', () => {
   })
 
   describe('#createFund', () => {
+    const lockPeriod = 15;
+    const baseLine = 10;
+    const managerFee = 15;
+
     it('creates the fund at the expected address', async () => {
       const token = fixture.tokens[0]
-      const expectedAddress = computeFundAddress(fixture.factory.address, wallet.address, token.address, fixture.fundByteCode)
+      const expectedAddress = computeFundAddress(fixture.factory.address, wallet.address, token.address, lockPeriod, baseLine, managerFee, fixture.fundByteCode)
       const code = await wallet.provider.getCode(expectedAddress)
       expect(code).to.eq('0x')
 
       expect(await fixture.controller.verifiedToken(token.address)).to.eq(true)
-      await fixture.factory.createFund(token.address, ethers.utils.formatBytes32String('abc'))
+      await fixture.factory.createFund(token.address, ethers.utils.formatBytes32String('abc'), lockPeriod, baseLine, managerFee)
 
       const codeAfter = await wallet.provider.getCode(expectedAddress)
       expect(codeAfter).to.not.eq('0x')
@@ -67,8 +70,8 @@ describe('HotPotV2FundFactory', () => {
       expect(fundBefore).to.eq(constants.AddressZero)
 
       expect(await fixture.controller.verifiedToken(token.address)).to.eq(true)
-      const expectedAddress = computeFundAddress(fixture.factory.address, wallet.address, token.address, fixture.fundByteCode)
-      await expect(fixture.factory.createFund(token.address, ethers.utils.formatBytes32String('abc')))
+      const expectedAddress = computeFundAddress(fixture.factory.address, wallet.address, token.address, lockPeriod, baseLine, managerFee, fixture.fundByteCode)
+      await expect(fixture.factory.createFund(token.address, ethers.utils.formatBytes32String('abc'), lockPeriod, baseLine, managerFee))
         .to.emit(fixture.factory, 'FundCreated')
         .withArgs(wallet.address, token.address, expectedAddress)
 
@@ -82,12 +85,22 @@ describe('HotPotV2FundFactory', () => {
       expect(await fixture.factory.getFund(wallet.address, token.address)).to.eq(constants.AddressZero)
       expect(await fixture.controller.verifiedToken(token.address)).to.eq(false)
 
-      await expect(fixture.factory.createFund(token.address, ethers.utils.formatBytes32String('abc'))).to.be.reverted
+      await expect(fixture.factory.createFund(token.address, ethers.utils.formatBytes32String('abc'), lockPeriod, baseLine, managerFee)).to.be.reverted
+    })
+
+    it('fails if lockPeriod > 1095 days', async () => {
+      const token = fixture.tokens[0]
+      await expect(fixture.factory.createFund(token.address, ethers.utils.formatBytes32String('abc'), 1095 * 24 * 3600 + 1, baseLine, managerFee)).to.be.reverted
+    })
+
+    it('fails if managerFee > 45', async () => {
+      const token = fixture.tokens[0]
+      await expect(fixture.factory.createFund(token.address, ethers.utils.formatBytes32String('abc'), lockPeriod, baseLine, 45 + 1)).to.be.reverted
     })
 
     it('gas', async () => {
       await snapshotGasCost(
-        fixture.factory.createFund(fixture.tokens[0].address, ethers.utils.formatBytes32String('abc'))
+        fixture.factory.createFund(fixture.tokens[0].address, ethers.utils.formatBytes32String('abc'), lockPeriod, baseLine, managerFee)
       )
     })
   })

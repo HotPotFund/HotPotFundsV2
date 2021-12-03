@@ -1,4 +1,4 @@
-import { constants } from 'ethers'
+import { BigNumber, constants } from 'ethers'
 import { createFixtureLoader } from 'ethereum-waffle'
 import { ethers, waffle } from 'hardhat'
 import { expect } from './shared/expect'
@@ -31,8 +31,11 @@ describe('HotPotV2FundERC20', () => {
         await fixture.controller.setVerifiedToken(fixture.tokens[2].address, true)
         await fixture.controller.setVerifiedToken(fixture.tokens[3].address, false)
         await fixture.controller.setVerifiedToken(fixture.tokens[4].address, false)
-        fixture.factory.createFund(token.address, ethers.utils.formatBytes32String('abc'));
-        const fundAddress = computeFundAddress(fixture.factory.address, wallet.address, token.address, fixture.fundByteCode)
+        const lockPeriod = 15;
+        const baseLine = 10;
+        const managerFee = 15;
+        fixture.factory.createFund(token.address, ethers.utils.formatBytes32String('abc'), lockPeriod, baseLine, managerFee);
+        const fundAddress = computeFundAddress(fixture.factory.address, wallet.address, token.address, lockPeriod, baseLine, managerFee, fixture.fundByteCode)
         hotPotFund = fundAtAddress(fundAddress, wallet);
 
         await fixture.tokens[0].approve(hotPotFund.address, MaxUint256);

@@ -27,6 +27,9 @@ const initDepositAmount = 1e1;
 const INIT_DEPOSIT_AMOUNT_18 = expandTo18Decimals(initDepositAmount);
 const INIT_DEPOSIT_AMOUNT_6 = expandTo6Decimals(initDepositAmount);
 const IS_SHOW_LOG = false;
+const lockPeriod = 10;
+const baseLine = 1;
+const managerFee = 15;
 
 const overrides = {
     gasLimit: 9999999
@@ -51,6 +54,7 @@ describe('HotPotV2Fund', () => {
     let t0T1Pool: IUniswapV3Pool;
 
     let INIT_DEPOSIT_AMOUNT: BigNumber;
+    let toleranceTime = 0;
 
     const hotPotFundFixture: Fixture<CompleteFixture> = async (wallets, provider) => {
         const fixture = await completeFixture(wallets, provider, governance)
@@ -93,7 +97,7 @@ describe('HotPotV2Fund', () => {
         fundT1Pool = await createUniV3PoolAndInit(manager, fixture, investToken, token2);
 
         //create a fund
-        hotPotFund = await createFund(manager, investToken, descriptor, fixture.factory);
+        hotPotFund = await createFund(manager, investToken, descriptor, lockPeriod, baseLine, managerFee, fixture.factory);
 
         return fixture
     }
@@ -124,6 +128,15 @@ describe('HotPotV2Fund', () => {
                 },
                 descriptor:{
                     value: ethers.utils.formatBytes32String(descriptor)
+                },
+                lockPeriod: {
+                    value: lockPeriod
+                },
+                baseLine: {
+                    value: baseLine
+                },
+                managerFee: {
+                    value: managerFee
                 },
                 totalInvestment: {
                     value: 0
@@ -279,6 +292,7 @@ describe('HotPotV2Fund', () => {
             totalAssets = totalAssets.add(addAmount);
 
             //first deposit
+            expect(await hotPotFund.lastDepositTime(depositor.address)).to.eq(0)
             await investToken.connect(depositor).approve(hotPotFund.address, constants.MaxUint256)
             let tx = hotPotFund.connect(depositor).deposit(addAmount);
             await expect(tx)
@@ -286,6 +300,8 @@ describe('HotPotV2Fund', () => {
               .withArgs(depositor.address, addAmount, addShare)
             await snapshotGasCost(tx);
             await showAssetStatus("first deposit：");
+            let block = await ethers.provider.getBlock(await ethers.provider.getBlockNumber())
+            expect(await hotPotFund.lastDepositTime(depositor.address)).to.eq(block.timestamp)
             expect(await hotPotFund.totalInvestment()).to.eq(totalInvestment)
             expect(await hotPotFund.investmentOf(depositor.address)).to.eq(investment)
             expect(await hotPotFund.balanceOf(depositor.address)).to.eq(balance)
@@ -307,6 +323,8 @@ describe('HotPotV2Fund', () => {
               .withArgs(depositor.address, addAmount, addShare)
             await snapshotGasCost(tx);
             await showAssetStatus("second deposit：");
+            block = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+            expect(await hotPotFund.lastDepositTime(depositor.address)).to.eq(block.timestamp);
             expect(await hotPotFund.totalInvestment()).to.eq(totalInvestment)
             expect(await hotPotFund.investmentOf(depositor.address)).to.eq(investment)
             expect(await hotPotFund.balanceOf(depositor.address)).to.eq(balance)
@@ -1113,6 +1131,11 @@ describe('HotPotV2Fund', () => {
         return {tickLower, tickUpper};
     }
 
+    async function waitLockPeriod() {
+        await ethers.provider.send("evm_increaseTime", [lockPeriod])
+        await ethers.provider.send("evm_mine", [])
+    }
+
     describe("#withdraw", ()=>{
         beforeEach("set path and init position", async()=>{
             //path for token0
@@ -1191,6 +1214,7 @@ describe('HotPotV2Fund', () => {
                 const balanceBefore = await depositor.getBalance();
                 const removeToUserAmount = INIT_DEPOSIT_AMOUNT;
 
+                await waitLockPeriod();
                 const transaction = await hotPotFund.connect(depositor).withdraw(share, 5,
                   Math.round(new Date().getTime() / 1e3 + 12000), overrides);
                 const gasFee = transaction.gasLimit.mul(transaction.gasPrice);
@@ -1240,10 +1264,18 @@ describe('HotPotV2Fund', () => {
             ).to.be.revertedWith('CDL')
         });
 
+        it('fail if during the lock-up period', async () => {
+            const share = await hotPotFund.balanceOf(depositor.address)
+            await expect(hotPotFund.connect(depositor).withdraw(
+                share, 0, Math.round(new Date().getTime() / 1e3 + 12000))
+            ).to.be.revertedWith('LKP')
+        });
+
         describe("works", ()=>{
             it("withdraw immediately after deposit", async () =>{
                 const share = await hotPotFund.balanceOf(depositor.address);
                 const removeToUserAmount = INIT_DEPOSIT_AMOUNT;
+                await waitLockPeriod();
                 const tx = hotPotFund.connect(depositor).withdraw(share, 1, Math.round(new Date().getTime() / 1e3 + 12000), overrides);
                 await expect(tx)
                     //burn share
@@ -1331,6 +1363,8 @@ describe('HotPotV2Fund', () => {
                     investmentOf,
                     await investToken.balanceOf(hotPotFund.address),
                     expecteds.expectedTotalAssets,
+                    baseLine,
+                    managerFee,
                     expecteds.expectedAssets2DArr,
                     investToken,
                     hotPotFund,
@@ -1338,6 +1372,7 @@ describe('HotPotV2Fund', () => {
                     manager
                 );
 
+                await waitLockPeriod();
                 let tx = hotPotFund.connect(depositor).withdraw(shareAmount, 1, Math.round(new Date().getTime() / 1e3 + 12000), overrides);
                 await expect(tx)
                   //burn share

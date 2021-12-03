@@ -13,7 +13,10 @@ contract HotPotV2FundDeployer is IHotPotV2FundDeployer {
         address controller;
         address manager;
         address token;
-        bytes32 descriptor;
+        bytes descriptor;
+        uint lockPeriod;
+        uint baseLine;
+        uint managerFee;
     }
 
     /// @inheritdoc IHotPotV2FundDeployer
@@ -24,7 +27,10 @@ contract HotPotV2FundDeployer is IHotPotV2FundDeployer {
     /// @param controller The controller address
     /// @param manager The manager address of this fund
     /// @param token The local token address
-    /// @param descriptor 32 bytes string descriptor, 8 bytes manager name + 24 bytes brief description
+    /// @param descriptor bytes string descriptor, the first 32 bytes manager name + next bytes brief description
+    /// @param lockPeriod Fund lock up period
+    /// @param baseLine Baseline of fund manager fee ratio
+    /// @param managerFee When the ROI is greater than the baseline, the fund manager’s fee ratio
     function deploy(
         address WETH9,
         address uniswapV3Factory,
@@ -32,7 +38,10 @@ contract HotPotV2FundDeployer is IHotPotV2FundDeployer {
         address controller,
         address manager,
         address token,
-        bytes32 descriptor
+        bytes memory descriptor,
+        uint lockPeriod,
+        uint baseLine,
+        uint managerFee
     ) internal returns (address fund) {
         parameters = Parameters({
             WETH9: WETH9,
@@ -41,10 +50,13 @@ contract HotPotV2FundDeployer is IHotPotV2FundDeployer {
             controller: controller,
             manager: manager,
             token: token, 
-            descriptor: descriptor
+            descriptor: descriptor,
+            lockPeriod: lockPeriod,
+            baseLine: baseLine,
+            managerFee: managerFee
         });
 
-        fund = address(new HotPotV2Fund{salt: keccak256(abi.encode(manager, token))}());
+        fund = address(new HotPotV2Fund{salt: keccak256(abi.encode(manager, token, lockPeriod, baseLine, managerFee))}());
         delete parameters;
     }
 }

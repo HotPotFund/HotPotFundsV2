@@ -9,8 +9,7 @@ import { IUniswapV3Pool } from '../../typechain/IUniswapV3Pool'
 import { TickMathTest } from '../../typechain/TickMathTest'
 import { IHotPotV2Fund } from '../../typechain/IHotPotV2Fund'
 
-const FEE = BigNumber.from(10).mul(BigNumber.from(2).pow(128))
-const MANAGER_FEE = BigNumber.from(10).mul(BigNumber.from(2).pow(128))
+const FEE = BigNumber.from(5)
 const DIVISOR = BigNumber.from(100).mul(BigNumber.from(2).pow(128))
 
 /**
@@ -430,6 +429,8 @@ export async function calExpectedWithdrawAmount(removeShare: BigNumber,
                                                 investmentOf: BigNumber,
                                                 fundBalance: BigNumber,
                                                 totalAssets: BigNumber,
+                                                baseLine: number,
+                                                managerFee: number,
                                                 assetsOfPosition: Array<Array<BigNumber>>,
                                                 investToken: Contract,
                                                 hotPotFund: IHotPotV2Fund,
@@ -438,7 +439,6 @@ export async function calExpectedWithdrawAmount(removeShare: BigNumber,
   let investment = investmentOf.mul(removeShare).div(userTotalShare)
   let amount = totalAssets.mul(removeShare).div(totalShare)
 
-  let totalAssets1 = await hotPotFund.totalAssets()
   // 还需要从大到小从头寸中撤资.
   if (amount.gt(fundBalance)) {
     let remainingAmount = amount.sub(fundBalance)
@@ -505,12 +505,13 @@ export async function calExpectedWithdrawAmount(removeShare: BigNumber,
   }
 
   let manager_fee = BigNumber.from(0), fee = BigNumber.from(0)
+  const baseAmount = investment.add(investment.mul(baseLine).div(100))
   // 处理基金经理分成和基金分成
-  if (amount.gt(investment)) {
-    manager_fee = amount.sub(investment).mul(MANAGER_FEE).div(DIVISOR)
-    fee = amount.sub(investment).mul(FEE).div(DIVISOR)
+  if (amount.gt(baseAmount)) {
+    manager_fee = amount.sub(baseAmount).mul(managerFee).div(100)
+    fee = amount.sub(baseAmount).mul(FEE).div(100)
     amount = amount.sub(fee).sub(manager_fee)
-  } else
+  } else if (amount.lt(investment))
     investment = amount
 
   // console.log('withdraw:', { amount, manager_fee, fee, investment })

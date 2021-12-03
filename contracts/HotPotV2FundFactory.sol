@@ -38,11 +38,13 @@ contract HotPotV2FundFactory is IHotPotV2FundFactory, HotPotV2FundDeployer {
     }
     
     /// @inheritdoc IHotPotV2FundFactory
-    function createFund(address token, bytes32 descriptor) external override returns (address fund){
+    function createFund(address token, bytes calldata descriptor, uint lockPeriod, uint baseLine, uint managerFee) external override returns (address fund){
         require(IHotPotV2FundController(controller).verifiedToken(token));
         require(getFund[msg.sender][token] == address(0));
+        require(lockPeriod <= 1095 days);
+        require(managerFee <= 45);
 
-        fund = deploy(WETH9, uniV3Factory, uniV3Router, controller, msg.sender, token, descriptor);
+        fund = deploy(WETH9, uniV3Factory, uniV3Router, controller, msg.sender, token, descriptor, lockPeriod, baseLine, managerFee);
         getFund[msg.sender][token] = fund;
 
         emit FundCreated(msg.sender, token, fund);

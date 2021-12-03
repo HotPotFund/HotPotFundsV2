@@ -70,7 +70,7 @@ describe('HotPotV2FundController', () => {
         INIT_HARVEST_AMOUNT = await investToken.decimals() == 18 ? INIT_HARVEST_AMOUNT_18 : INIT_HARVEST_AMOUNT_6;
 
         await fixture.controller.connect(governance).setVerifiedToken(investToken.address, true);
-        hotPotFund = await createFund(manager, investToken, "abc", fixture.factory);
+        hotPotFund = await createFund(manager, investToken, "abc", 0, 0, 15, fixture.factory);
 
         await mintAndDepositHotPotFund(hotPotFund, investToken, depositor, INIT_DEPOSIT_AMOUNT);
 

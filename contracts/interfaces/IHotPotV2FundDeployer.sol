@@ -11,7 +11,10 @@ interface IHotPotV2FundDeployer {
     /// Returns controller The controller address
     /// Returns manager The manager address of this fund
     /// Returns token The local token address
-    /// Returns descriptor 32 bytes string descriptor, 8 bytes manager name + 24 bytes brief description
+    /// Returns descriptor bytes string descriptor, the first 32 bytes manager name + next bytes brief description
+    /// Returns lockPeriod Fund lock up period
+    /// Returns baseLine Baseline of fund manager fee ratio
+    /// Returns managerFee When the ROI is greater than the baseline, the fund manager’s fee ratio
     function parameters()
         external
         view
@@ -22,6 +25,9 @@ interface IHotPotV2FundDeployer {
             address controller,
             address manager,
             address token,
-            bytes32 descriptor
+            bytes memory descriptor,
+            uint lockPeriod,
+            uint baseLine,
+            uint managerFee
         );
 }
