@@ -63,10 +63,12 @@ export function decodePath(path: string): [string[], number[]] {
 }
 
 //no-start with 0x string
-export function skipToken(path: string): string {
-  return path.slice(NEXT_OFFSET * 2, path.length - NEXT_OFFSET * 2)
+export function skipToken(path: string = ''): string {
+  path = path.replace('0x', '')
+  return path.slice(NEXT_OFFSET * 2)
 }
 
-export function hasMultiplePools(path: string): boolean {
+export function hasMultiplePools(path: string = ''): boolean {
+  path = path.replace('0x', '')
   return path.length >= MULTIPLE_POOLS_MIN_LENGTH * 2
 }

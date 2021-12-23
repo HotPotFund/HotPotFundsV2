@@ -90,7 +90,7 @@ describe('HotPotV2Fund', () => {
         //t0+t1 pool
         t0T1Pool = await createUniV3PoolAndInit(manager, fixture, token0, token1);
         //investToken+t2 pool
-        fundT1Pool = await createUniV3PoolAndInit(manager, fixture, investToken, token2);
+        await createUniV3PoolAndInit(manager, fixture, investToken, token2);
 
         //create a fund
         hotPotFund = await createFund(manager, investToken, descriptor, fixture.factory);
@@ -530,145 +530,197 @@ describe('HotPotV2Fund', () => {
         beforeEach("set path and init position", async()=>{
             //path for token0
             await setPaths(
-              token0.address,
-              encodePath([investToken.address, token0.address], [FeeAmount.MEDIUM]),
-              encodePath([token0.address, investToken.address], [FeeAmount.MEDIUM]))
+                token0.address,
+                encodePath([investToken.address, token1.address, token0.address], [FeeAmount.MEDIUM,FeeAmount.MEDIUM]),
+                encodePath([token0.address, token1.address, investToken.address], [FeeAmount.MEDIUM,FeeAmount.MEDIUM]))
             //path for token1
             await setPaths(
-              token1.address,
-              encodePath([investToken.address, token1.address], [FeeAmount.MEDIUM]),
-              encodePath([token1.address, investToken.address], [FeeAmount.MEDIUM]))
+                token1.address,
+                encodePath([investToken.address, token0.address, token1.address], [FeeAmount.MEDIUM,FeeAmount.MEDIUM]),
+                encodePath([token1.address, token0.address, investToken.address], [FeeAmount.MEDIUM,FeeAmount.MEDIUM]))
 
             //deposit investToken
             await mintAndDepositHotPotFund(hotPotFund, investToken, depositor, INIT_DEPOSIT_AMOUNT);
 
+            let curTick = Math.floor((await t0T1Pool.slot0()).tick / TICK_SPACINGS[FeeAmount.MEDIUM]) * TICK_SPACINGS[FeeAmount.MEDIUM]
             // init positions[0][0]: t0+t1
             await expect(fixture.controller.connect(manager).init(
-              hotPotFund.address,
-              token0.address, token1.address, FeeAmount.MEDIUM,
-              getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              0
+                hotPotFund.address,
+                token0.address, token1.address, FeeAmount.MEDIUM,
+                curTick + TICK_SPACINGS[FeeAmount.MEDIUM] * 200,
+                curTick + TICK_SPACINGS[FeeAmount.MEDIUM] * 202,
+                0
             )).to.not.be.reverted
             // init positions[0][1]: t0+t1
             await expect(fixture.controller.connect(manager).init(
-              hotPotFund.address,
-              token0.address, token1.address, FeeAmount.MEDIUM,
-              getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM])+TICK_SPACINGS[FeeAmount.MEDIUM] * 10,
-              getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM])-TICK_SPACINGS[FeeAmount.MEDIUM] * 10,
-              0
+                hotPotFund.address,
+                token0.address, token1.address, FeeAmount.MEDIUM,
+                curTick - TICK_SPACINGS[FeeAmount.MEDIUM] * 202,
+                curTick - TICK_SPACINGS[FeeAmount.MEDIUM] * 200,
+                0,
             )).to.not.be.reverted
+            // init positions[0][2]: t0+t1
+            await expect(fixture.controller.connect(manager).init(
+                hotPotFund.address,
+                token0.address, token1.address, FeeAmount.MEDIUM,
+                getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
+                getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
+                0,
+            )).to.not.be.reverted
+
+            curTick = Math.floor((await fundT0Pool.slot0()).tick / TICK_SPACINGS[FeeAmount.MEDIUM]) * TICK_SPACINGS[FeeAmount.MEDIUM]
             // init positions[1][0]: fund+t0
             let tokens = sortedTokens(investToken, token0);
             await expect(fixture.controller.connect(manager).init(
-              hotPotFund.address,
-              tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
-              getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              0
+                hotPotFund.address,
+                tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
+                curTick + TICK_SPACINGS[FeeAmount.MEDIUM] * 200,
+                curTick + TICK_SPACINGS[FeeAmount.MEDIUM] * 202,
+                0
             )).to.not.be.reverted
+            // init positions[1][1]: fund+t0
+            await expect(fixture.controller.connect(manager).init(
+                hotPotFund.address,
+                tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
+                curTick - TICK_SPACINGS[FeeAmount.MEDIUM] * 202,
+                curTick - TICK_SPACINGS[FeeAmount.MEDIUM] * 200,
+                0
+            )).to.not.be.reverted
+            // init positions[1][2]: fund+t0
+            await expect(fixture.controller.connect(manager).init(
+                hotPotFund.address,
+                tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
+                getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
+                getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
+                0
+            )).to.not.be.reverted
+
             // init positions[2][0]: fund+t1
             tokens = sortedTokens(investToken, token1);
             await expect(fixture.controller.connect(manager).init(
-              hotPotFund.address,
-              tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
-              getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
-              0
+                hotPotFund.address,
+                tokens[0].address, tokens[1].address, FeeAmount.MEDIUM,
+                getMinTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
+                getMaxTick(TICK_SPACINGS[FeeAmount.MEDIUM]),
+                0
             )).to.not.be.reverted
             expect(await hotPotFund.poolsLength()).to.eq(3);
-            expect(await hotPotFund.positionsLength(0)).to.eq(2);
-            expect(await hotPotFund.positionsLength(1)).to.eq(1);
+            expect(await hotPotFund.positionsLength(0)).to.eq(3);
+            expect(await hotPotFund.positionsLength(1)).to.eq(3);
             expect(await hotPotFund.positionsLength(2)).to.eq(1);
         })
 
         it("1.1 fails if action isn't called by controller", async () => {
             await expect(hotPotFund.connect(manager).add(
-              0, 0, INIT_DEPOSIT_AMOUNT, true,
-              overrides
+                0, 0, INIT_DEPOSIT_AMOUNT, true
             )).to.be.reverted
 
             await expect(fixture.controller.connect(manager).add(
-              hotPotFund.address,
-              0, 0, INIT_DEPOSIT_AMOUNT, true,
-              overrides
+                hotPotFund.address,
+                0, 0, INIT_DEPOSIT_AMOUNT, true
             )).to.not.be.reverted
         });
 
         it("2 fails if index is invalid", async()=>{
             await expect(fixture.controller.connect(manager).add(
-              hotPotFund.address,
-              3, 0, INIT_DEPOSIT_AMOUNT, true,
-              overrides
+                hotPotFund.address,
+                3, 0, INIT_DEPOSIT_AMOUNT, true,
+                overrides
             )).to.be.reverted
             await expect(fixture.controller.connect(manager).add(
-              hotPotFund.address,
-              0, 2, INIT_DEPOSIT_AMOUNT, true,
-              overrides
+                hotPotFund.address,
+                0, 3, INIT_DEPOSIT_AMOUNT, true,
+                overrides
             )).to.be.reverted
         })
 
         it("3 fails if balance < amount or amount==0", async()=>{
             await expect(fixture.controller.connect(manager).add(
-              hotPotFund.address,
-              0, 0, INIT_DEPOSIT_AMOUNT.add(BigNumber.from(1)), false,
-              overrides
+                hotPotFund.address,
+                0, 0, INIT_DEPOSIT_AMOUNT.add(BigNumber.from(1)), false,
+                overrides
             )).to.be.reverted
             //amount==0
             await expect(fixture.controller.connect(manager).add(
-              hotPotFund.address,
-              0, 0, 0, false,
-              overrides
+                hotPotFund.address,
+                0, 0, 0, false,
+                overrides
             )).to.be.reverted
             //fee==0
             await expect(fixture.controller.connect(manager).add(
-              hotPotFund.address,
-              0, 0, 0, true,
-              overrides
+                hotPotFund.address,
+                0, 0, 0, true,
+                overrides
             )).to.be.reverted
         })
 
         it("works", async() => {
             await showAssetStatus("init status：");
+            let count = 7;
+            let addAmount = INIT_DEPOSIT_AMOUNT.div(count);
+            let deadline = Math.round(new Date().getTime() / 1e3 + 12000);
             let tx = fixture.controller.connect(manager).add(
-              hotPotFund.address,
-              0, 0, INIT_DEPOSIT_AMOUNT.div(4), false,
-              overrides
+                hotPotFund.address, 0, 0, addAmount, false,
+                overrides
             );
             await expect(tx).to.not.be.reverted
             await snapshotGasCost(tx);
-            await showAssetStatus("add [0][0] 1/4：");
-            let funds = await showAddLavePercent(INIT_DEPOSIT_AMOUNT.div(4), INIT_DEPOSIT_AMOUNT);
+            await showAssetStatus(`add [0][0] 1/${count}：`);
+            let funds = await showAddLavePercent(addAmount, INIT_DEPOSIT_AMOUNT);
 
             tx = fixture.controller.connect(manager).add(
-              hotPotFund.address,
-              0, 1, INIT_DEPOSIT_AMOUNT.div(4), false,
-              overrides
+                hotPotFund.address, 0, 1, addAmount, false,
+                overrides
             );
             await expect(tx).to.not.be.reverted
             await snapshotGasCost(tx);
-            await showAssetStatus("add [0][1] 1/4：");
-            funds = await showAddLavePercent(INIT_DEPOSIT_AMOUNT.div(4), funds);
+            await showAssetStatus(`add [0][1] 1/${count}：`);
+            funds = await showAddLavePercent(addAmount, funds);
 
             tx = fixture.controller.connect(manager).add(
-              hotPotFund.address,
-              1, 0, INIT_DEPOSIT_AMOUNT.div(4), false,
-              overrides
+                hotPotFund.address, 0, 2, addAmount, false,
+                overrides
             );
             await expect(tx).to.not.be.reverted
             await snapshotGasCost(tx);
-            await showAssetStatus("add [1][0] 1/4：");
-            funds = await showAddLavePercent(INIT_DEPOSIT_AMOUNT.div(4), funds);
+            await showAssetStatus(`add [0][2] 1/${count}：`);
+            funds = await showAddLavePercent(addAmount, funds);
 
             tx = fixture.controller.connect(manager).add(
-              hotPotFund.address,
-              2, 0, INIT_DEPOSIT_AMOUNT.div(4), false,
-              overrides
+                hotPotFund.address, 1, 0, addAmount, false,
+                overrides
             );
             await expect(tx).to.not.be.reverted
             await snapshotGasCost(tx);
-            await showAssetStatus("add [2][0] 1/4：");
-            funds = await showAddLavePercent(INIT_DEPOSIT_AMOUNT.div(4), funds);
+            await showAssetStatus(`add [1][0] 1/${count}：`);
+            funds = await showAddLavePercent(addAmount, funds);
+
+            tx = fixture.controller.connect(manager).add(
+                hotPotFund.address, 1, 1, addAmount, false,
+                overrides
+            );
+            await expect(tx).to.not.be.reverted
+            await snapshotGasCost(tx);
+            await showAssetStatus(`add [1][1] 1/${count}：`);
+            funds = await showAddLavePercent(addAmount, funds);
+
+            tx = fixture.controller.connect(manager).add(
+                hotPotFund.address, 1, 2, addAmount, false,
+                overrides
+            );
+            await expect(tx).to.not.be.reverted
+            await snapshotGasCost(tx);
+            await showAssetStatus(`add [1][2] 1/${count}：`);
+            funds = await showAddLavePercent(addAmount, funds);
+
+            tx = fixture.controller.connect(manager).add(
+                hotPotFund.address, 2, 0, addAmount, false,
+                overrides
+            );
+            await expect(tx).to.not.be.reverted
+            await snapshotGasCost(tx);
+            await showAssetStatus(`add [2][0] 1/${count}：`);
+            funds = await showAddLavePercent(addAmount, funds);
         })
     })
 
@@ -1024,10 +1076,13 @@ describe('HotPotV2Fund', () => {
             console.log(`balanceOfShare: ${await hotPotFund.balanceOf(depositor.address)}`)
             console.log(`totalInvestment: ${await hotPotFund.totalInvestment()}`)
             console.log(`investmentOf: ${await hotPotFund.investmentOf(depositor.address)}`)
+            console.log(`tickAtT0T1Pool：${(await t0T1Pool.slot0()).tick}`)
             console.log(`balance0AtT0T1Pool：${await token0.balanceOf(t0T1Pool.address)}`)
             console.log(`balance1AtT0T1Pool：${await token1.balanceOf(t0T1Pool.address)}`)
+            console.log(`tickAtT0T1Pool：${(await fundT0Pool.slot0()).tick}`)
             console.log(`balanceFAtFundT0Pool：${await investToken.balanceOf(fundT0Pool.address)}`)
             console.log(`balance0AtFundT0Pool：${await token0.balanceOf(fundT0Pool.address)}`)
+            console.log(`tickAtT0T1Pool：${(await fundT1Pool.slot0()).tick}`)
             console.log(`balanceFAtFundT1Pool：${await investToken.balanceOf(fundT1Pool.address)}`)
             console.log(`balance1AtFundT1Pool：${await token1.balanceOf(fundT1Pool.address)}`)
             console.groupEnd();

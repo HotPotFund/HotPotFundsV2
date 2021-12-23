@@ -55,7 +55,6 @@ export function getAmountsForAmount0(
 async function getSqrtPriceX96(uniV3Factory: string, path: string, tickMath: TickMathTest, wallet: Wallet, isCurrentPrice: boolean) {
   let sqrtPriceX96 = BigNumber.from(2).pow(FixedPoint96.RESOLUTION)
   while (true) {
-    const hasMultiplePool = hasMultiplePools(path)
     const [[tokenIn, tokenOut], [fee]] = decodePath(path)
 
     let _sqrtPriceX96
@@ -73,7 +72,7 @@ async function getSqrtPriceX96(uniV3Factory: string, path: string, tickMath: Tic
       : sqrtPriceX96.mul(_sqrtPriceX96).div(FixedPoint96.Q96)
 
     // decide whether to continue or terminate
-    if (hasMultiplePool)
+    if (hasMultiplePools(path))
       path = '0x' + skipToken(path)
     else
       return sqrtPriceX96
